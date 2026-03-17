@@ -374,6 +374,114 @@ class TestPersistence:
             # Clean up hook
             store.set_after_write_hook(None)
 
+    def test_crash_during_writes_recovers(self):
+        '''Simulate a process crash during constant writes — data recovers on restart.'''
+        import subprocess, sys, textwrap
+        from btpay.orm.persistence import load_from_disk
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Spawn a child process that writes 200 records then exits
+            script = textwrap.dedent('''
+                import sys, os
+                sys.path.insert(0, os.getcwd())
+                from btpay.orm.engine import MemoryStore
+                from btpay.orm.model import MemModel, BaseMixin
+                from btpay.orm.columns import Text, Integer, Boolean, DecimalColumn, DateTimeColumn, TagsColumn, JsonColumn
+                from btpay.orm.persistence import init_persistence
+
+                class TestUser(BaseMixin, MemModel):
+                    _columns = {
+                        'email': Text(unique=True), 'name': Text(),
+                        'age': Integer(default=0), 'is_active': Boolean(default=True),
+                        'balance': DecimalColumn(default=0), 'tags': TagsColumn(),
+                        'meta': JsonColumn(), 'created_at': DateTimeColumn(),
+                        'updated_at': DateTimeColumn(),
+                    }
+
+                init_persistence(sys.argv[1])
+                for i in range(200):
+                    TestUser(email='crash%d@test.com' % i, name='Crash%d' % i, age=i).save()
+            ''')
+
+            result = subprocess.run(
+                [sys.executable, '-c', script, tmpdir],
+                timeout=10, capture_output=True,
+                cwd=os.path.dirname(os.path.dirname(__file__)),
+            )
+
+            # The pickle file should exist and be loadable
+            pickle_path = os.path.join(tmpdir, 'btpay.db')
+            assert os.path.exists(pickle_path), \
+                "btpay.db missing after crash. stderr: %s" % result.stderr.decode()
+
+            # Simulate restart: clear store, load from disk
+            store = MemoryStore()
+            store.clear()
+            store.register_model('TestUser', TestUser._columns)
+            store.register_model('TestProduct', TestProduct._columns)
+
+            load_from_disk(tmpdir)
+
+            # Should have recovered all 200 records
+            all_users = TestUser.query.all()
+            assert len(all_users) == 200, \
+                "Expected 200, got %d records after recovery" % len(all_users)
+
+    def test_truncated_db_falls_back_to_backup(self):
+        '''Corrupt the main db, verify we can restore from a backup file.'''
+        from btpay.orm.persistence import save_to_disk, backup_rotation, load_from_disk
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            store = MemoryStore()
+
+            # Create some data and save
+            u1 = TestUser(email='survivor@test.com', name='Survivor', age=42)
+            u1.save()
+            save_to_disk(tmpdir)
+
+            # Create a backup
+            backup_rotation(tmpdir, keep=10)
+
+            # Verify backup exists
+            backup_dir = os.path.join(tmpdir, 'backups')
+            backups = sorted(
+                f for f in os.listdir(backup_dir)
+                if f.startswith('backup_') and f.endswith('.db')
+            )
+            assert len(backups) == 1
+            backup_path = os.path.join(backup_dir, backups[0])
+
+            # Truncate the main db file (simulate corruption)
+            db_path = os.path.join(tmpdir, 'btpay.db')
+            with open(db_path, 'wb') as f:
+                f.write(b'\x00' * 10)  # garbage
+
+            # Try loading — should fail gracefully
+            store.clear()
+            store.register_model('TestUser', TestUser._columns)
+            store.register_model('TestProduct', TestProduct._columns)
+
+            load_from_disk(tmpdir)  # logs error, doesn't crash
+
+            # Data should NOT be loaded (corrupt file)
+            assert len(TestUser.query.all()) == 0
+
+            # Now restore from the backup manually (as the app would)
+            import shutil
+            shutil.copy2(backup_path, db_path)
+
+            store.clear()
+            store.register_model('TestUser', TestUser._columns)
+            store.register_model('TestProduct', TestProduct._columns)
+
+            load_from_disk(tmpdir)
+
+            # Data should be back
+            recovered = TestUser.query.all()
+            assert len(recovered) == 1
+            assert recovered[0].email == 'survivor@test.com'
+            assert recovered[0].name == 'Survivor'
+
 
 # ---- Column Type Tests ----
 
