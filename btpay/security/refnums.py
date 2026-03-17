@@ -53,9 +53,17 @@ class ReferenceNumbers:
         self.class_map = get_model_registry()
 
     def _apply_keys(self, key_hex, nonce_hex):
-        '''Set key, nonce, and box from hex strings.'''
-        key = bytes.fromhex(key_hex)
-        nonce = bytes.fromhex(nonce_hex)
+        '''Set key, nonce, and box from hex or raw strings.'''
+        import hashlib
+        try:
+            key = bytes.fromhex(key_hex)
+        except (ValueError, AttributeError):
+            # Non-hex input (e.g. Render generateValue) — derive hex via SHA-256
+            key = hashlib.sha256(key_hex.encode()).digest()
+        try:
+            nonce = bytes.fromhex(nonce_hex)
+        except (ValueError, AttributeError):
+            nonce = hashlib.sha256(nonce_hex.encode()).digest()[:24]
         assert len(key) == 32, "REFNUM_KEY must be 32 bytes (64 hex chars)"
         assert len(nonce) == 24, "REFNUM_NONCE must be 24 bytes (48 hex chars)"
         # Store on class so classmethods and instance both see them
