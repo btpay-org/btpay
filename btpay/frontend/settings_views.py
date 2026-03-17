@@ -1259,7 +1259,7 @@ def updates():
     from btpay.updater.git_updater import is_git_available, is_git_repo
     from btpay.updater.backup import get_update_history
 
-    app_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    app_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     data_dir = current_app.config.get('DATA_DIR', 'data')
 
     return render_template('settings/updates.html',
@@ -1314,7 +1314,7 @@ def updates_apply():
     from btpay.updater.backup import create_code_backup, create_data_backup, record_update
     from btpay.updater.restart import pip_install, trigger_restart
 
-    app_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    app_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     data_dir = current_app.config.get('DATA_DIR', 'data')
     backup_dir = os.path.join(data_dir, 'backups')
     os.makedirs(backup_dir, exist_ok=True)
@@ -1400,7 +1400,7 @@ def updates_rollback():
     from btpay.updater.restart import pip_install, trigger_restart
 
     data_dir = current_app.config.get('DATA_DIR', 'data')
-    app_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    app_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
     code_backup = request.form.get('code_backup', '')
     data_backup = request.form.get('data_backup', '')
