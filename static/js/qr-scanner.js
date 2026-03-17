@@ -285,7 +285,20 @@
         _targetField = targetField || 'xpub';
         _bbqrSession = null;
 
-        loadHtml5Qr().then(function() {
+        // Request camera permission first to trigger the browser prompt,
+        // then hand off to html5-qrcode for the actual scanning.
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            alert('Camera access is not available. Use HTTPS or localhost.');
+            return;
+        }
+
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+        .then(function(stream) {
+            // Got permission — stop the stream so html5-qrcode can claim it
+            stream.getTracks().forEach(function(t) { t.stop(); });
+            return loadHtml5Qr();
+        })
+        .then(function() {
             var modal = createScannerModal();
             modal.classList.remove('hidden');
 
@@ -306,17 +319,17 @@
                 onScanSuccess,
                 function() {} // ignore scan failures (no QR found in frame)
             ).catch(function(err) {
-                var msg = String(err);
-                if (msg.indexOf('NotAllowedError') !== -1 || msg.indexOf('Permission') !== -1) {
-                    if (status) status.textContent = 'Camera blocked. Click the lock icon in your address bar to allow camera access, then try again.';
-                } else if (msg.indexOf('NotFoundError') !== -1) {
-                    if (status) status.textContent = 'No camera found on this device.';
-                } else {
-                    if (status) status.textContent = 'Camera error: ' + msg;
-                }
+                if (status) status.textContent = 'Camera error: ' + err;
             });
         }).catch(function(err) {
-            alert('Could not load QR scanner: ' + err.message);
+            var msg = String(err);
+            if (msg.indexOf('NotAllowedError') !== -1 || msg.indexOf('Permission') !== -1) {
+                alert('Camera permission denied. Please allow camera access in your browser settings and try again.');
+            } else if (msg.indexOf('NotFoundError') !== -1) {
+                alert('No camera found on this device.');
+            } else {
+                alert('Could not access camera: ' + msg);
+            }
         });
     }
 
