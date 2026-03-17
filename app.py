@@ -188,7 +188,7 @@ def _register_middleware(app):
         response.headers['X-Frame-Options'] = 'DENY'
         response.headers['X-XSS-Protection'] = '0'
         response.headers['Referrer-Policy'] = 'no-referrer'
-        response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
+        response.headers['Permissions-Policy'] = 'camera=(self), microphone=(), geolocation=()'
 
         if not app.config.get('DEV_MODE'):
             response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
