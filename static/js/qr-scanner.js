@@ -37,20 +37,15 @@
     }
 
     function zlibInflate(data) {
-        // Use DecompressionStream API (available in modern browsers)
-        // Fallback: raw inflate via pako if available
-        // For BBQr: wbits=10, no zlib header -- this is raw deflate
-        if (typeof DecompressionStream !== 'undefined') {
-            return new Promise(function(resolve, reject) {
-                // DecompressionStream expects proper deflate/gzip, but BBQr uses
-                // raw deflate with wbits=10. We need to add a zlib header.
-                // zlib header for wbits=10: CMF=0x48 (CM=8, CINFO=4), FLG=0x01
-                var header = new Uint8Array([0x48, 0x01]);
-                var withHeader = new Uint8Array(header.length + data.length);
-                withHeader.set(header);
-                withHeader.set(data, header.length);
+        // BBQr uses raw deflate (wbits=10, no zlib/gzip header).
+        // Try 'deflate-raw' first, then fall back to 'deflate' (zlib-wrapped).
+        if (typeof DecompressionStream === 'undefined') {
+            return Promise.reject(new Error('Decompression not supported'));
+        }
 
-                var ds = new DecompressionStream('deflate');
+        function tryDecompress(format, inputData) {
+            return new Promise(function(resolve, reject) {
+                var ds = new DecompressionStream(format);
                 var writer = ds.writable.getWriter();
                 var reader = ds.readable.getReader();
                 var chunks = [];
@@ -69,12 +64,17 @@
                     return reader.read().then(pump);
                 }).catch(reject);
 
-                writer.write(withHeader).then(function() {
+                writer.write(inputData).then(function() {
                     writer.close();
                 }).catch(reject);
             });
         }
-        return Promise.reject(new Error('Decompression not supported'));
+
+        // Try raw deflate first (BBQr standard: wbits=10, no header)
+        return tryDecompress('deflate-raw', data).catch(function() {
+            // Fall back to zlib-wrapped deflate (some implementations add header)
+            return tryDecompress('deflate', data);
+        });
     }
 
     function parseBBQrHeader(data) {
@@ -285,7 +285,20 @@
         _targetField = targetField || 'xpub';
         _bbqrSession = null;
 
-        loadHtml5Qr().then(function() {
+        // Request camera permission first to trigger the browser prompt,
+        // then hand off to html5-qrcode for the actual scanning.
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            alert('Camera access is not available. Use HTTPS or localhost.');
+            return;
+        }
+
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+        .then(function(stream) {
+            // Got permission — stop the stream so html5-qrcode can claim it
+            stream.getTracks().forEach(function(t) { t.stop(); });
+            return loadHtml5Qr();
+        })
+        .then(function() {
             var modal = createScannerModal();
             modal.classList.remove('hidden');
 
@@ -309,7 +322,14 @@
                 if (status) status.textContent = 'Camera error: ' + err;
             });
         }).catch(function(err) {
-            alert('Could not load QR scanner: ' + err.message);
+            var msg = String(err);
+            if (msg.indexOf('NotAllowedError') !== -1 || msg.indexOf('Permission') !== -1) {
+                alert('Camera permission denied. Please allow camera access in your browser settings and try again.');
+            } else if (msg.indexOf('NotFoundError') !== -1) {
+                alert('No camera found on this device.');
+            } else {
+                alert('Could not access camera: ' + msg);
+            }
         });
     }
 

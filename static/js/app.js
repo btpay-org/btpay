@@ -150,9 +150,8 @@
     });
 
     // Expose for inline use
-    window.BTPay = {
-        toggleTheme: toggleTheme,
-        toggleSidebar: toggleSidebar,
-    };
+    window.BTPay = window.BTPay || {};
+    window.BTPay.toggleTheme = toggleTheme;
+    window.BTPay.toggleSidebar = toggleSidebar;
 
 })();
