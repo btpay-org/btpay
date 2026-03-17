@@ -1,0 +1,45 @@
+#
+# systemd service file for BTPay
+#
+# Copy to /etc/systemd/system/btpay.service
+# systemctl enable btpay
+# systemctl start btpay
+#
+
+[Unit]
+Description=BTPay — Self-hosted Bitcoin Payment Processor
+After=network.target
+
+[Service]
+Type=notify
+User=btpay
+Group=btpay
+WorkingDirectory=/opt/btpay
+ExecStart=/opt/btpay/.venv/bin/gunicorn -c deploy/gunicorn.conf.py wsgi:app
+ExecReload=/bin/kill -s HUP $MAINPID
+
+# Graceful shutdown — send SIGTERM, wait for data save
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+# Restart policy
+Restart=on-failure
+RestartSec=5
+
+# Environment
+Environment=BTPAY_DATA_DIR=/opt/btpay/data
+Environment=BTPAY_BIND=127.0.0.1:5000
+Environment=BTPAY_NUM_PROXIES=1
+
+# Security hardening
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/opt/btpay/data
+
+# Resource limits
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

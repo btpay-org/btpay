@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+{% block title %}Invoices — BTPay{% endblock %}
+{% block content %}
+<div class="flex justify-between items-center mb-6">
+    <h2 class="text-2xl font-bold">Invoices</h2>
+    <div class="flex items-center space-x-2">
+        <a href="{{ url_for('invoices.export_csv', status=request.args.get('status', ''), q=request.args.get('q', ''), date_from=request.args.get('date_from', ''), date_to=request.args.get('date_to', '')) }}"
+           class="px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            Export CSV
+        </a>
+        <a href="{{ url_for('invoices.create') }}" class="px-4 py-2 bg-brand text-white text-sm font-medium rounded-lg hover:opacity-90">
+            New Invoice
+        </a>
+    </div>
+</div>
+
+<!-- Search & Filters -->
+<div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mb-4 space-y-3">
+    <form method="GET" action="{{ url_for('invoices.list_invoices') }}" class="flex flex-wrap items-end gap-3">
+        <div class="flex-1 min-w-[200px]">
+            <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Search</label>
+            <input type="text" name="q" value="{{ request.args.get('q', '') }}" placeholder="Customer name, email, or invoice #"
+                   class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+        </div>
+        <div>
+            <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">From</label>
+            <input type="date" name="date_from" value="{{ request.args.get('date_from', '') }}"
+                   class="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+        </div>
+        <div>
+            <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">To</label>
+            <input type="date" name="date_to" value="{{ request.args.get('date_to', '') }}"
+                   class="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+        </div>
+        {% if request.args.get('status') %}<input type="hidden" name="status" value="{{ request.args.get('status') }}">{% endif %}
+        <button type="submit" class="px-4 py-2 bg-brand text-white text-sm rounded-lg hover:opacity-90">Search</button>
+        {% if request.args.get('q') or request.args.get('date_from') or request.args.get('date_to') %}
+        <a href="{{ url_for('invoices.list_invoices', status=request.args.get('status', '')) }}" class="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">Clear</a>
+        {% endif %}
+    </form>
+
+    <div class="flex items-center space-x-2 pt-1">
+        {% set current_status = request.args.get('status', '') %}
+        {% for s in ['', 'draft', 'pending', 'paid', 'confirmed', 'expired', 'cancelled'] %}
+        <a href="{{ url_for('invoices.list_invoices', status=s, q=request.args.get('q', ''), date_from=request.args.get('date_from', ''), date_to=request.args.get('date_to', '')) }}"
+           class="px-3 py-1.5 text-sm rounded-lg {% if current_status == s %}bg-brand text-white{% else %}text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700{% endif %}">
+            {{ s.capitalize() if s else 'All' }}
+        </a>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Table -->
+<div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead>
+                <tr class="text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider border-b border-gray-200 dark:border-gray-700">
+                    <th class="px-6 py-3">Invoice #</th>
+                    <th class="px-6 py-3">Customer</th>
+                    <th class="px-6 py-3">Total</th>
+                    <th class="px-6 py-3">Paid</th>
+                    <th class="px-6 py-3">Method</th>
+                    <th class="px-6 py-3">Status</th>
+                    <th class="px-6 py-3">Created</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                {% for inv in invoices %}
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                    <td class="px-6 py-4">
+                        <a href="{{ url_for('invoices.detail', ref=inv.invoice_number) }}" class="text-brand hover:underline font-medium">{{ inv.invoice_number }}</a>
+                    </td>
+                    <td class="px-6 py-4 text-sm">{{ inv.customer_name or inv.customer_email or '—' }}</td>
+                    <td class="px-6 py-4 text-sm font-medium">{{ inv.total|currency(inv.currency) }}</td>
+                    <td class="px-6 py-4 text-sm">{{ inv.amount_paid|currency(inv.currency) }}</td>
+                    <td class="px-6 py-4 text-sm">{{ inv.payments[0].method|method_label if inv.payments else (inv.payment_methods_enabled|primary_method|method_label if inv.payment_methods_enabled else '—') }}</td>
+                    <td class="px-6 py-4">{{ inv.status|status_badge }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-500">{{ inv.created_at|time_ago }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">No invoices found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% include 'components/pagination.html' %}
+{% endblock %}

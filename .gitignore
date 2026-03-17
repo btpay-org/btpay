@@ -1,0 +1,44 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+*.so
+*.dylib
+
+# Config overrides and secrets
+config.py
+
+# Runtime data
+data/*.json
+data/backups/
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Tailwind build
+node_modules/
+static/css/app.css
+
+# Uploads
+static/uploads/
+
+# Claude Code
+.claude/
+
+# pytest
+.pytest_cache/

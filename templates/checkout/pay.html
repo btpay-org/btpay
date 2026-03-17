@@ -1,0 +1,426 @@
+{% extends 'base.html' %}
+{% block title %}Pay {{ invoice.invoice_number }} — BTPay{% endblock %}
+{% block head %}{% if org and org.custom_checkout_css %}<style>{{ org.custom_checkout_css }}</style>{% endif %}{% endblock %}
+
+{% macro checkout_body() %}
+<div class="max-w-lg mx-auto py-8">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
+        <!-- Header -->
+        <div class="p-6 border-b border-gray-200 dark:border-gray-700 text-center">
+            {% if org and org.logo_url %}
+            <img src="{{ org.logo_url }}" alt="{{ org.name }}" class="h-10 mx-auto mb-3">
+            {% elif org %}
+            <h2 class="text-xl font-bold mb-1">{{ org.name }}</h2>
+            {% endif %}
+            <p class="text-sm text-gray-500 dark:text-gray-400">Invoice {{ invoice.invoice_number }}</p>
+        </div>
+
+        <!-- Amount -->
+        <div class="p-6 text-center border-b border-gray-200 dark:border-gray-700">
+            <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Amount Due</p>
+            <p class="text-3xl font-bold">{{ invoice.amount_due|currency(invoice.currency) }}</p>
+            {% if invoice.btc_amount and invoice.btc_amount > 0 %}
+            <p class="text-lg text-gray-600 dark:text-gray-300 mt-1">{{ invoice.btc_amount|btc }} BTC</p>
+            {% endif %}
+        </div>
+
+        {% if invoice.notes %}
+        <div class="px-6 py-3 bg-blue-50 dark:bg-blue-900/20 border-b border-gray-200 dark:border-gray-700">
+            <p class="text-sm text-blue-800 dark:text-blue-200 whitespace-pre-wrap">{{ invoice.notes }}</p>
+        </div>
+        {% endif %}
+
+        {% set methods = checkout_methods|default([]) %}
+
+        <!-- Method selector tabs (only if multiple methods) -->
+        {% if methods|length > 1 %}
+        <div class="overflow-x-auto border-b border-gray-200 dark:border-gray-700 -webkit-overflow-scrolling-touch" id="method-tabs">
+            <div class="flex min-w-max">
+            {% for m in methods %}
+            <button onclick="selectMethod('{{ m.name }}')"
+                    id="tab-{{ m.name }}"
+                    class="flex-shrink-0 px-4 py-3 text-sm font-medium text-center border-b-2 transition-colors whitespace-nowrap
+                           {% if loop.first %}border-brand text-brand{% else %}border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300{% endif %}">
+                {{ m.display_name }}
+            </button>
+            {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Payment method panels -->
+        {% for m in methods %}
+
+        {# Bitcoin #}
+        {% if m.type == 'bitcoin' %}
+        <div id="method-{{ m.name }}" class="method-panel {% if not loop.first and methods|length > 1 %}hidden{% endif %}">
+            <div class="p-4 bg-yellow-50 dark:bg-yellow-900/20 text-center" id="countdown-bar">
+                <p class="text-sm text-yellow-800 dark:text-yellow-200">
+                    Quote expires in <span id="countdown" class="font-mono font-bold">--:--</span>
+                </p>
+            </div>
+
+            {% if payment_address %}
+            <div class="p-6 text-center">
+                <div class="inline-block p-4 bg-white rounded-xl shadow-inner mb-4">
+                    <img src="{{ url_for('checkout.qr_code', ref=invoice.ref_number) }}"
+                         alt="Payment QR Code" class="w-48 h-48">
+                </div>
+
+                <div class="mt-4">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 uppercase mb-2">Bitcoin Address</p>
+                    <div class="flex items-center justify-center space-x-2">
+                        <code id="btc-address" class="text-sm font-mono bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded break-all">{{ payment_address }}</code>
+                        <button onclick="copyText('btc-address')" class="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" title="Copy address">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                {% if invoice.btc_amount and invoice.btc_amount > 0 %}
+                <div class="mt-4">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 uppercase mb-2">Amount</p>
+                    <div class="flex items-center justify-center space-x-2">
+                        <code id="btc-amount" class="text-sm font-mono bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded">{{ invoice.btc_amount|btc }}</code>
+                        <button onclick="copyText('btc-amount')" class="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" title="Copy amount">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 uppercase mb-2">BIP21 Payment URI</p>
+                    <div class="flex items-center justify-center space-x-2">
+                        <code id="btc-uri" class="text-xs font-mono bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded break-all">bitcoin:{{ payment_address }}?amount={{ invoice.btc_amount|btc }}</code>
+                        <button onclick="copyText('btc-uri')" class="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" title="Copy BIP21 URI">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <button onclick="copyAll()" class="w-full py-2 text-sm text-brand border border-brand/30 rounded-lg hover:bg-brand/5 font-medium">
+                        Copy All Payment Details
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+            {% else %}
+            <div class="p-6 text-center text-gray-500">
+                <p>Payment address not yet assigned.</p>
+            </div>
+            {% endif %}
+
+            <div class="payment-status p-4 border-t border-gray-200 dark:border-gray-700 text-center">
+                <p class="text-sm text-gray-500 dark:text-gray-400">Waiting for payment...</p>
+                <div class="mt-2"><span class="inline-block w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></span></div>
+            </div>
+        </div>
+        {% endif %}
+
+        {# Wire Transfer #}
+        {% if m.type == 'wire' %}
+        <div id="method-{{ m.name }}" class="method-panel {% if not loop.first and methods|length > 1 %}hidden{% endif %}">
+            <div class="p-6">
+                <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase mb-4">Wire Transfer Details</h3>
+                <dl class="space-y-3 text-sm">
+                    {% if m.info.bank_name %}
+                    <div class="flex justify-between"><dt class="text-gray-500">Bank</dt><dd class="font-medium text-right">{{ m.info.bank_name }}</dd></div>
+                    {% endif %}
+                    {% if m.info.account_name %}
+                    <div class="flex justify-between"><dt class="text-gray-500">Beneficiary</dt><dd class="font-medium text-right">{{ m.info.account_name }}</dd></div>
+                    {% endif %}
+                    {% if m.info.account_number %}
+                    <div class="flex justify-between"><dt class="text-gray-500">Account</dt><dd class="font-mono text-right">{{ m.info.account_number }}</dd></div>
+                    {% endif %}
+                    {% if m.info.routing_number %}
+                    <div class="flex justify-between"><dt class="text-gray-500">Routing</dt><dd class="font-mono text-right">{{ m.info.routing_number }}</dd></div>
+                    {% endif %}
+                    {% if m.info.swift_code %}
+                    <div class="flex justify-between"><dt class="text-gray-500">SWIFT/BIC</dt><dd class="font-mono text-right">{{ m.info.swift_code }}</dd></div>
+                    {% endif %}
+                    {% if m.info.iban %}
+                    <div class="flex justify-between"><dt class="text-gray-500">IBAN</dt><dd class="font-mono text-right">{{ m.info.iban }}</dd></div>
+                    {% endif %}
+                    {% if m.info.bank_address %}
+                    <div class="flex justify-between"><dt class="text-gray-500">Bank Address</dt><dd class="text-right">{{ m.info.bank_address }}</dd></div>
+                    {% endif %}
+                    <div class="flex justify-between pt-3 border-t border-gray-200 dark:border-gray-700">
+                        <dt class="text-gray-500">Amount</dt><dd class="font-bold text-lg">{{ invoice.amount_due|currency(invoice.currency) }}</dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-gray-500">Reference</dt><dd class="font-mono font-bold">{{ invoice.invoice_number }}</dd>
+                    </div>
+                </dl>
+                {% if m.info.notes %}
+                <div class="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <p class="text-sm text-blue-800 dark:text-blue-200">{{ m.info.notes }}</p>
+                </div>
+                {% endif %}
+                <div class="mt-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg text-center">
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Include the reference number in your wire transfer memo.</p>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {# BTCPay Server #}
+        {% if m.type == 'btcpay' %}
+        <div id="method-{{ m.name }}" class="method-panel {% if not loop.first and methods|length > 1 %}hidden{% endif %}">
+            <div class="p-6 text-center">
+                <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase mb-4">Pay via BTCPay Server</h3>
+
+                {% if m.info.checkout_url %}
+                <p class="text-sm text-gray-600 dark:text-gray-300 mb-6">
+                    Complete your payment securely through BTCPay Server. Supports both on-chain Bitcoin and Lightning Network.
+                </p>
+                <a href="{{ m.info.checkout_url }}" target="_blank" rel="noopener"
+                   class="inline-block px-8 py-3 bg-brand text-white font-medium rounded-lg hover:opacity-90 text-base">
+                    Pay with BTCPay Server &rarr;
+                </a>
+                <p class="text-xs text-gray-400 mt-4">You will be redirected to the payment page.</p>
+                {% else %}
+                <p class="text-sm text-gray-500">BTCPay invoice is being prepared...</p>
+                {% endif %}
+            </div>
+
+            <div class="payment-status p-4 border-t border-gray-200 dark:border-gray-700 text-center">
+                <p class="text-sm text-gray-500 dark:text-gray-400">Waiting for payment...</p>
+                <div class="mt-2"><span class="inline-block w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></span></div>
+            </div>
+        </div>
+        {% endif %}
+
+        {# Lightning (LNbits) #}
+        {% if m.type == 'lightning' %}
+        <div id="method-{{ m.name }}" class="method-panel {% if not loop.first and methods|length > 1 %}hidden{% endif %}">
+            <div class="p-6 text-center">
+                <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase mb-4">Pay with Lightning</h3>
+
+                {% if m.info.bolt11 %}
+                <div class="inline-block p-4 bg-white rounded-xl shadow-inner mb-4">
+                    <img src="{{ url_for('checkout.qr_code', ref=invoice.ref_number, method='lnbits') }}"
+                         alt="Lightning Invoice QR" class="w-48 h-48">
+                </div>
+
+                {% if m.info.amount_sat %}
+                <div class="mb-4">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 uppercase mb-2">Amount</p>
+                    <p class="text-lg font-bold">{{ '{:,}'.format(m.info.amount_sat) }} sats</p>
+                </div>
+                {% endif %}
+
+                <div class="mb-4">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 uppercase mb-2">Lightning Invoice</p>
+                    <div class="flex items-center justify-center space-x-2">
+                        <code id="ln-invoice" class="text-xs font-mono bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded break-all max-w-sm inline-block">{{ m.info.bolt11[:40] }}...{{ m.info.bolt11[-10:] }}</code>
+                        <input type="hidden" id="ln-invoice-full" value="{{ m.info.bolt11 }}">
+                        <button onclick="navigator.clipboard.writeText(document.getElementById('ln-invoice-full').value).then(function(){var b=event.target.closest('button')||event.target;b.style.color='#22c55e';setTimeout(function(){b.style.color='';},800)})" class="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" title="Copy invoice">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <button onclick="navigator.clipboard.writeText(document.getElementById('ln-invoice-full').value).then(function(){var b=event.target.closest('button');b.textContent='Copied!';setTimeout(function(){b.textContent='Copy Full Invoice';},1500)})"
+                        class="w-full py-2 text-sm text-brand border border-brand/30 rounded-lg hover:bg-brand/5 font-medium">
+                    Copy Full Invoice
+                </button>
+                {% else %}
+                <p class="text-sm text-gray-500">Lightning invoice is being prepared...</p>
+                {% endif %}
+            </div>
+
+            <div class="payment-status p-4 border-t border-gray-200 dark:border-gray-700 text-center">
+                <p class="text-sm text-gray-500 dark:text-gray-400">Waiting for payment...</p>
+                <div class="mt-2"><span class="inline-block w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></span></div>
+            </div>
+        </div>
+        {% endif %}
+
+        {# Stablecoin #}
+        {% if m.type == 'stablecoin' %}
+        <div id="method-{{ m.name }}" class="method-panel {% if not loop.first and methods|length > 1 %}hidden{% endif %}">
+            <div class="p-6">
+                <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase mb-4">Pay with {{ m.token_symbol }}</h3>
+
+                {% if m.accounts|length > 1 %}
+                <div class="mb-4">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 uppercase mb-2">Select Network</p>
+                    <div class="space-y-2" id="chain-selector-{{ m.token }}">
+                        {% for acct in m.accounts %}
+                        <label class="flex items-center p-3 border rounded-lg cursor-pointer transition-colors
+                                      {% if loop.first %}border-brand bg-brand/5{% else %}border-gray-200 dark:border-gray-600 hover:border-brand/50{% endif %}"
+                               onclick="selectChain('{{ m.token }}', '{{ acct.chain }}')">
+                            <input type="radio" name="chain_{{ m.token }}" value="{{ acct.chain }}"
+                                   {% if loop.first %}checked{% endif %}
+                                   class="w-4 h-4 text-brand border-gray-300 focus:ring-brand">
+                            <span class="ml-3 text-sm font-medium">{{ acct.chain_name }}</span>
+                            <span class="ml-auto text-xs font-mono text-gray-400">{{ acct.short_address }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {% for acct in m.accounts %}
+                <div id="chain-{{ m.token }}-{{ acct.chain }}" class="chain-details {% if not loop.first %}hidden{% endif %}">
+                    <div class="mb-4">
+                        <p class="text-xs text-gray-500 dark:text-gray-400 uppercase mb-2">Send exactly</p>
+                        <div class="flex items-center justify-center space-x-2">
+                            <code id="stable-amount-{{ m.token }}-{{ acct.chain }}" class="text-lg font-mono font-bold bg-gray-100 dark:bg-gray-700 px-4 py-2 rounded">{{ invoice.amount_due }} {{ m.token_symbol }}</code>
+                            <button onclick="copyText('stable-amount-{{ m.token }}-{{ acct.chain }}')" class="p-2 text-gray-400 hover:text-gray-600" title="Copy amount">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <p class="text-xs text-gray-500 dark:text-gray-400 uppercase mb-2">To address ({{ acct.chain_name }})</p>
+                        <div class="flex items-center space-x-2">
+                            <code id="stable-addr-{{ m.token }}-{{ acct.chain }}" class="flex-1 text-sm font-mono bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded break-all">{{ acct.address }}</code>
+                            <button onclick="copyText('stable-addr-{{ m.token }}-{{ acct.chain }}')" class="p-2 text-gray-400 hover:text-gray-600 flex-shrink-0" title="Copy address">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    {% if acct.explorer_url %}
+                    <p class="text-xs text-center mb-4">
+                        <a href="{{ acct.explorer_url }}" target="_blank" rel="noopener" class="text-brand hover:underline">View on explorer &rarr;</a>
+                    </p>
+                    {% endif %}
+
+                    <div class="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                        <p class="text-sm text-amber-800 dark:text-amber-200">{{ acct.info.warning }}</p>
+                    </div>
+                </div>
+                {% endfor %}
+
+                <div class="mt-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg text-center">
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Stablecoin payments are manually verified. Allow up to 24 hours for confirmation.</p>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% endfor %}
+
+        {% if not methods %}
+        <!-- Fallback: legacy BTC-only -->
+        {% if payment_address %}
+        <div class="p-4 bg-yellow-50 dark:bg-yellow-900/20 text-center" id="countdown-bar">
+            <p class="text-sm text-yellow-800 dark:text-yellow-200">
+                Quote expires in <span id="countdown" class="font-mono font-bold">--:--</span>
+            </p>
+        </div>
+        <div class="p-6 text-center">
+            <div class="inline-block p-4 bg-white rounded-xl shadow-inner mb-4">
+                <img src="{{ url_for('checkout.qr_code', ref=invoice.ref_number) }}" alt="QR" class="w-48 h-48">
+            </div>
+            <div class="mt-4">
+                <p class="text-xs text-gray-500 uppercase mb-2">Bitcoin Address</p>
+                <code id="btc-address" class="text-sm font-mono bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded break-all">{{ payment_address }}</code>
+            </div>
+        </div>
+        <div class="payment-status p-4 border-t border-gray-200 dark:border-gray-700 text-center">
+            <p class="text-sm text-gray-500">Waiting for payment...</p>
+        </div>
+        {% else %}
+        <div class="p-6 text-center text-gray-500"><p>No payment methods available.</p></div>
+        {% endif %}
+        {% endif %}
+    </div>
+
+    <p class="text-xs text-center text-gray-400 mt-4 flex items-center justify-center space-x-1">
+        <span>Powered by</span>
+        <a href="https://btpay.org" target="_blank" rel="noopener" class="inline-flex items-center space-x-1 hover:text-gray-600">
+            <img src="{{ url_for('static', filename='images/btpay-icon.svg') }}" alt="" class="h-3.5 w-3.5">
+            <span class="font-medium">BTPay</span>
+        </a>
+    </p>
+</div>
+
+<script>
+var invoiceRef = {{ invoice.ref_number|tojson }};
+var quoteDeadline = {{ quote_deadline|default(1800)|tojson }};
+var rateLockedAt = {{ rate_locked_at|default(0)|tojson }};
+
+function selectMethod(name) {
+    document.querySelectorAll('.method-panel').forEach(function(el) { el.classList.add('hidden'); });
+    var panel = document.getElementById('method-' + name);
+    if (panel) panel.classList.remove('hidden');
+    var tabs = document.getElementById('method-tabs');
+    if (tabs) {
+        tabs.querySelectorAll('button').forEach(function(btn) {
+            btn.classList.remove('border-brand', 'text-brand');
+            btn.classList.add('border-transparent', 'text-gray-500');
+        });
+        var activeTab = document.getElementById('tab-' + name);
+        if (activeTab) {
+            activeTab.classList.remove('border-transparent', 'text-gray-500');
+            activeTab.classList.add('border-brand', 'text-brand');
+        }
+    }
+}
+
+function selectChain(token, chain) {
+    document.querySelectorAll('[id^="chain-' + token + '-"]').forEach(function(el) { el.classList.add('hidden'); });
+    var detail = document.getElementById('chain-' + token + '-' + chain);
+    if (detail) detail.classList.remove('hidden');
+    var selector = document.getElementById('chain-selector-' + token);
+    if (selector) {
+        selector.querySelectorAll('label').forEach(function(lbl) {
+            lbl.classList.remove('border-brand', 'bg-brand/5');
+            lbl.classList.add('border-gray-200', 'dark:border-gray-600');
+        });
+        var radio = selector.querySelector('input[value="' + chain + '"]');
+        if (radio) {
+            var lbl = radio.closest('label');
+            lbl.classList.remove('border-gray-200', 'dark:border-gray-600');
+            lbl.classList.add('border-brand', 'bg-brand/5');
+        }
+    }
+}
+
+function copyText(elementId) {
+    var el = document.getElementById(elementId);
+    if (!el) return;
+    navigator.clipboard.writeText(el.textContent.trim()).then(function() {
+        el.style.outline = '2px solid #22c55e';
+        setTimeout(function() { el.style.outline = ''; }, 800);
+    });
+}
+
+function copyAll() {
+    var parts = [];
+    var addr = document.getElementById('btc-address');
+    var amt = document.getElementById('btc-amount');
+    var uri = document.getElementById('btc-uri');
+    if (addr) parts.push('Address: ' + addr.textContent.trim());
+    if (amt) parts.push('Amount: ' + amt.textContent.trim() + ' BTC');
+    if (uri) parts.push('URI: ' + uri.textContent.trim());
+    if (parts.length) {
+        navigator.clipboard.writeText(parts.join('\n')).then(function() {
+            var btn = event.target.closest('button');
+            if (btn) { btn.textContent = 'Copied!'; setTimeout(function() { btn.textContent = 'Copy All Payment Details'; }, 1500); }
+        });
+    }
+}
+</script>
+<script src="{{ url_for('static', filename='js/checkout.js') }}"></script>
+{% endmacro %}
+
+{% block public_content %}{{ checkout_body() }}{% endblock %}
+{% block content %}{{ checkout_body() }}{% endblock %}

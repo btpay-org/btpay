@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% block title %}Storefronts — BTPay{% endblock %}
+{% block content %}
+<div class="flex justify-between items-center mb-6">
+    <h2 class="text-2xl font-bold">Storefronts</h2>
+    <a href="{{ url_for('storefronts.create_storefront') }}" class="px-4 py-2 bg-brand text-white text-sm font-medium rounded-lg hover:opacity-90">
+        New Storefront
+    </a>
+</div>
+
+{% if storefronts %}
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    {% for sf in storefronts %}
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden border border-gray-200 dark:border-gray-700">
+        {% if sf.hero_image_url %}
+        <div class="h-32 bg-gray-200 dark:bg-gray-700 bg-cover bg-center" style="background-image: url('{{ sf.hero_image_url }}')"></div>
+        {% else %}
+        <div class="h-32 bg-gradient-to-br from-brand/20 to-brand/5 flex items-center justify-center">
+            {% if sf.is_donation %}
+            <svg class="w-12 h-12 text-brand/50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
+            {% else %}
+            <svg class="w-12 h-12 text-brand/50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
+            {% endif %}
+        </div>
+        {% endif %}
+        <div class="p-4">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-lg font-semibold">{{ sf.title }}</h3>
+                <span class="px-2 py-0.5 text-xs rounded-full {% if sf.is_active %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200{% else %}bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400{% endif %}">
+                    {{ 'Active' if sf.is_active else 'Inactive' }}
+                </span>
+            </div>
+            <div class="flex items-center space-x-2 text-xs text-gray-500 dark:text-gray-400 mb-3">
+                <span class="px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-700">{{ sf.storefront_type|capitalize }}</span>
+                <span>{{ sf.currency }}</span>
+                <span>{{ sf.total_orders }} orders</span>
+            </div>
+            <div class="flex items-center justify-between">
+                <a href="{{ url_for('storefronts.edit_storefront', storefront_id=sf.id) }}" class="text-brand hover:underline text-sm font-medium">Edit</a>
+                <a href="{{ sf.public_url }}" target="_blank" class="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-sm">
+                    View Public Page &#8599;
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-12 text-center">
+    <svg class="w-16 h-16 mx-auto text-gray-300 dark:text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
+    <h3 class="text-lg font-medium text-gray-600 dark:text-gray-400 mb-2">No storefronts yet</h3>
+    <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Create a storefront to sell products or collect donations with Bitcoin payments.</p>
+    <a href="{{ url_for('storefronts.create_storefront') }}" class="inline-block px-4 py-2 bg-brand text-white text-sm font-medium rounded-lg hover:opacity-90">
+        Create Your First Storefront
+    </a>
+</div>
+{% endif %}
+{% endblock %}

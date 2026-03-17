@@ -1,0 +1,115 @@
+{% extends 'base.html' %}
+{% block title %}Wallets — BTPay{% endblock %}
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <h2 class="text-2xl font-bold mb-6">Settings</h2>
+
+    <div class="flex flex-col lg:flex-row gap-6">
+        {% include 'settings/_nav.html' %}
+
+        <div class="flex-1 space-y-6">
+            <!-- Existing wallets -->
+            {% if wallets %}
+            {% for w in wallets %}
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h3 class="font-medium">{{ w.name }}</h3>
+                        <p class="text-sm text-gray-500 mt-1">
+                            {{ w.wallet_type|upper }}
+                            {% if w.wallet_type == 'xpub' %} &middot; {{ w.address_type }}{% endif %}
+                            &middot; {{ w.network }}
+                        </p>
+                        {% if w.xpub %}
+                        <p class="text-xs font-mono text-gray-400 mt-2">{{ w.xpub[:16] }}...{{ w.xpub[-8:] }}</p>
+                        {% endif %}
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        {% if w.is_active %}
+                        <span class="px-2 py-1 text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 rounded">Active</span>
+                        {% else %}
+                        <span class="px-2 py-1 text-xs bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 rounded">Inactive</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="mt-3 flex items-center space-x-4 text-sm text-gray-500">
+                    <span>Index: {{ w.next_address_index }}</span>
+                    <span>Gap limit: {{ w.gap_limit }}</span>
+                </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 text-center text-gray-500">
+                <p>No wallets configured. Add one below to start accepting Bitcoin payments.</p>
+            </div>
+            {% endif %}
+
+            <!-- Add wallet form -->
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+                <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase mb-4">Add Wallet</h3>
+                <form method="POST" class="space-y-4">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Name</label>
+                        <input type="text" name="name" required placeholder="My Bitcoin Wallet"
+                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Type</label>
+                        <select name="wallet_type" id="wallet-type"
+                                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700"
+                                onchange="toggleWalletFields()">
+                            <option value="xpub">Extended Public Key (xpub/ypub/zpub)</option>
+                            <option value="descriptor">Output Descriptor</option>
+                            <option value="address_list">Address List</option>
+                        </select>
+                    </div>
+
+                    <div id="xpub-field">
+                        <label class="block text-sm font-medium mb-1">Extended Public Key</label>
+                        <textarea name="xpub" rows="2" placeholder="xpub6..."
+                                  class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 font-mono text-sm"></textarea>
+                        <p class="text-xs text-gray-500 mt-1">Supports xpub (P2PKH), ypub (P2SH-P2WPKH), zpub (P2WPKH)</p>
+                    </div>
+
+                    <div id="descriptor-field" class="hidden">
+                        <label class="block text-sm font-medium mb-1">Output Descriptor</label>
+                        <textarea name="descriptor" rows="2" placeholder="wpkh([fingerprint/path]xpub/0/*)"
+                                  class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 font-mono text-sm"></textarea>
+                    </div>
+
+                    <div id="addresses-field" class="hidden">
+                        <label class="block text-sm font-medium mb-1">Addresses (one per line)</label>
+                        <textarea name="addresses" rows="5" placeholder="bc1q..."
+                                  class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 font-mono text-sm"></textarea>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Network</label>
+                        <select name="network"
+                                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+                            <option value="mainnet">Mainnet</option>
+                            <option value="testnet">Testnet</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" class="px-6 py-2 bg-brand text-white rounded-lg hover:opacity-90 text-sm font-medium">
+                        Add Wallet
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleWalletFields() {
+    var t = document.getElementById('wallet-type').value;
+    document.getElementById('xpub-field').classList.toggle('hidden', t !== 'xpub');
+    document.getElementById('descriptor-field').classList.toggle('hidden', t !== 'descriptor');
+    document.getElementById('addresses-field').classList.toggle('hidden', t !== 'address_list');
+}
+</script>
+{% endblock %}

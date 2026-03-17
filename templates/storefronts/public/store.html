@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ sf.title }}{% if org %} — {{ org.name }}{% endif %}</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='images/btpay-icon.svg') }}">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: { extend: {
+                colors: {
+                    brand: {{ (sf.brand_color or (org.brand_color if org else "#F89F1B") or "#F89F1B")|tojson }},
+                },
+            }},
+        }
+    </script>
+</head>
+<body class="min-h-full bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100">
+<script>
+    if (localStorage.getItem('btpay_theme') === 'dark' ||
+        (!localStorage.getItem('btpay_theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+    }
+</script>
+
+<div class="max-w-4xl mx-auto px-4 py-8">
+    <!-- Header -->
+    {% if sf.hero_image_url %}
+    <div class="h-48 rounded-xl bg-cover bg-center mb-6" style="background-image: url('{{ sf.hero_image_url }}')"></div>
+    {% endif %}
+
+    <div class="text-center mb-8">
+        {% if org and org.logo_url %}
+        <img src="{{ org.logo_url }}" alt="{{ org.name }}" class="h-10 mx-auto mb-3">
+        {% endif %}
+        <h1 class="text-3xl font-bold mb-2">{{ sf.title }}</h1>
+        {% if sf.description %}
+        <p class="text-gray-600 dark:text-gray-400 max-w-lg mx-auto">{{ sf.description }}</p>
+        {% endif %}
+    </div>
+
+    <!-- Items grid -->
+    {% for cat_name, cat_items in categories.items() %}
+    {% if categories|length > 1 %}
+    <h2 class="text-xl font-semibold mb-4 mt-8">{{ cat_name }}</h2>
+    {% endif %}
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+        {% for item in cat_items %}
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden border border-gray-200 dark:border-gray-700 flex flex-col">
+            {% if item.image_url %}
+            <div class="h-40 bg-gray-200 dark:bg-gray-700 bg-cover bg-center" style="background-image: url('{{ item.image_url }}')"></div>
+            {% endif %}
+            <div class="p-4 flex-1 flex flex-col">
+                <h3 class="font-semibold mb-1">{{ item.title }}</h3>
+                {% if item.description %}
+                <p class="text-sm text-gray-500 dark:text-gray-400 mb-3 flex-1">{{ item.description }}</p>
+                {% else %}
+                <div class="flex-1"></div>
+                {% endif %}
+                <div class="flex items-center justify-between mt-2">
+                    <span class="text-lg font-bold text-brand">
+                        {% if item.is_pay_what_you_want %}
+                        Name your price
+                        {% else %}
+                        {{ item.price }} {{ sf.currency }}
+                        {% endif %}
+                    </span>
+                    {% if item.in_stock %}
+                    <form method="POST" action="{{ url_for('public_storefront.buy_item', slug=sf.slug, item_id=item.id) }}" class="flex items-center space-x-2">
+                        {% if item.is_pay_what_you_want %}
+                        <input type="number" name="amount" step="0.01" min="0.01" required placeholder="Amount"
+                               class="w-24 px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+                        {% endif %}
+                        {% if sf.require_name %}
+                        <input type="text" name="name" required placeholder="Name" class="w-28 px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+                        {% endif %}
+                        {% if sf.require_email %}
+                        <input type="email" name="email" required placeholder="Email" class="w-32 px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+                        {% endif %}
+                        <button type="submit" class="px-4 py-1.5 bg-brand text-white text-sm font-medium rounded-lg hover:opacity-90 whitespace-nowrap">
+                            {{ sf.button_text }}
+                        </button>
+                    </form>
+                    {% else %}
+                    <span class="text-sm text-gray-400">Out of stock</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endfor %}
+
+    <!-- Footer -->
+    <div class="text-center mt-12 pt-6 border-t border-gray-200 dark:border-gray-700">
+        <p class="text-xs text-gray-400">Powered by <a href="/" class="text-brand hover:underline">BTPay</a></p>
+    </div>
+</div>
+</body>
+</html>

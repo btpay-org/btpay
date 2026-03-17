@@ -1,0 +1,271 @@
+{% extends 'base.html' %}
+{% block title %}Edit {{ sf.title }} — BTPay{% endblock %}
+{% block content %}
+<div class="mb-6">
+    <a href="{{ url_for('storefronts.list_storefronts') }}" class="text-sm text-gray-500 hover:text-brand">&larr; Back to Storefronts</a>
+    <div class="flex items-center justify-between mt-2">
+        <h2 class="text-2xl font-bold">{{ sf.title }}</h2>
+        <div class="flex items-center space-x-3">
+            <a href="{{ sf.public_url }}" target="_blank" class="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+                View Public Page &#8599;
+            </a>
+            <form method="POST" action="{{ url_for('storefronts.delete_storefront', storefront_id=sf.id) }}" onsubmit="return confirm('Delete this storefront?')">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                <button class="px-3 py-1.5 text-sm text-red-600 border border-red-300 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20">Delete</button>
+            </form>
+        </div>
+    </div>
+    <div class="flex items-center space-x-3 mt-2 text-sm text-gray-500 dark:text-gray-400">
+        <span class="px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-700">{{ sf.storefront_type|capitalize }}</span>
+        <span>{{ sf.currency }}</span>
+        <span>{{ sf.total_orders }} orders</span>
+        <span>{{ sf.total_revenue|round(2) }} {{ sf.currency }} revenue</span>
+        <span>URL: <code class="text-xs">/s/{{ sf.slug }}</code></span>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Left: Settings -->
+    <div class="lg:col-span-1 space-y-4">
+        <form method="POST" class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 space-y-4">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+            <h3 class="text-lg font-semibold">Settings</h3>
+
+            <div>
+                <label class="block text-sm font-medium mb-1">Title</label>
+                <input type="text" name="title" value="{{ sf.title }}" required
+                       class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-1">Description</label>
+                <textarea name="description" rows="3"
+                          class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">{{ sf.description }}</textarea>
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-1">Currency</label>
+                <select name="currency" class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+                    {% for c in ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'CHF', 'JPY', 'BTC'] %}
+                    <option value="{{ c }}" {% if c == sf.currency %}selected{% endif %}>{{ c }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-1">Button Text</label>
+                <input type="text" name="button_text" value="{{ sf.button_text }}"
+                       class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-1">Hero Image URL</label>
+                <input type="url" name="hero_image_url" value="{{ sf.hero_image_url }}" placeholder="https://..."
+                       class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+            </div>
+            <div class="flex items-center space-x-2">
+                <input type="checkbox" name="is_active" value="1" {% if sf.is_active %}checked{% endif %} id="is_active" class="rounded">
+                <label for="is_active" class="text-sm">Active (visible to public)</label>
+            </div>
+
+            {% if sf.is_donation %}
+            <hr class="dark:border-gray-700">
+            <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Donation Settings</h4>
+            <div>
+                <label class="block text-sm font-medium mb-1">Preset Amounts</label>
+                <input type="text" name="donation_presets" value="{{ sf.donation_presets|join(', ') if sf.donation_presets else '' }}"
+                       class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+            </div>
+            <div class="flex items-center space-x-2">
+                <input type="checkbox" name="donation_allow_custom" value="1" {% if sf.donation_allow_custom %}checked{% endif %} id="allow_custom" class="rounded">
+                <label for="allow_custom" class="text-sm">Allow custom amounts</label>
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-1">Goal Amount</label>
+                <input type="number" name="donation_goal_amount" step="0.01" value="{{ sf.donation_goal_amount if sf.donation_goal_amount else '' }}"
+                       class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-1">Goal Label</label>
+                <input type="text" name="donation_goal_label" value="{{ sf.donation_goal_label }}"
+                       class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+            </div>
+            {% endif %}
+
+            <hr class="dark:border-gray-700">
+            <div class="flex items-center space-x-4">
+                <label class="flex items-center space-x-2">
+                    <input type="checkbox" name="require_email" value="1" {% if sf.require_email %}checked{% endif %} class="rounded">
+                    <span class="text-sm">Require email</span>
+                </label>
+                <label class="flex items-center space-x-2">
+                    <input type="checkbox" name="require_name" value="1" {% if sf.require_name %}checked{% endif %} class="rounded">
+                    <span class="text-sm">Require name</span>
+                </label>
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-1">Success Message</label>
+                <input type="text" name="success_message" value="{{ sf.success_message }}"
+                       class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-1">Redirect URL</label>
+                <input type="url" name="redirect_url" value="{{ sf.redirect_url }}"
+                       class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+            </div>
+
+            <button type="submit" class="w-full px-4 py-2 bg-brand text-white text-sm font-medium rounded-lg hover:opacity-90">Save Settings</button>
+        </form>
+    </div>
+
+    <!-- Right: Items -->
+    <div class="lg:col-span-2 space-y-4">
+        {% if sf.is_store %}
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold">Items ({{ items|length }})</h3>
+            </div>
+
+            <!-- Add item form -->
+            <form method="POST" action="{{ url_for('storefronts.add_item', storefront_id=sf.id) }}" class="mb-6 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg space-y-3">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                <h4 class="text-sm font-semibold">Add New Item</h4>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <input type="text" name="title" required placeholder="Item title"
+                               class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+                    </div>
+                    <div>
+                        <input type="number" name="price" step="0.01" min="0" placeholder="Price (0 = pay what you want)"
+                               class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+                    </div>
+                </div>
+                <div>
+                    <input type="text" name="description" placeholder="Description (optional)"
+                           class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <input type="url" name="image_url" placeholder="Image URL (optional)"
+                           class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+                    <input type="text" name="category" placeholder="Category (optional)"
+                           class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+                </div>
+                <button type="submit" class="px-4 py-2 bg-brand text-white text-sm rounded-lg hover:opacity-90">Add Item</button>
+            </form>
+
+            <!-- Items list -->
+            {% if items %}
+            <div class="space-y-3">
+                {% for item in items %}
+                <div class="border border-gray-200 dark:border-gray-600 rounded-lg {% if not item.is_active %}opacity-50{% endif %}">
+                    <div class="flex items-center justify-between p-3">
+                        <div class="flex items-center space-x-3">
+                            {% if item.image_url %}
+                            <img src="{{ item.image_url }}" class="w-10 h-10 rounded object-cover" alt="">
+                            {% else %}
+                            <div class="w-10 h-10 rounded bg-gray-200 dark:bg-gray-600 flex items-center justify-center text-gray-400 text-xs">IMG</div>
+                            {% endif %}
+                            <div>
+                                <div class="text-sm font-medium">{{ item.title }}</div>
+                                <div class="text-xs text-gray-500">
+                                    {% if item.is_pay_what_you_want %}Pay what you want{% else %}{{ item.price }} {{ sf.currency }}{% endif %}
+                                    {% if item.category %} &middot; {{ item.category }}{% endif %}
+                                    {% if not item.is_active %} &middot; <span class="text-red-500">Inactive</span>{% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <button onclick="toggleEditItem('item-edit-{{ item.id }}')" class="text-xs text-brand hover:text-brand/80">Edit</button>
+                            <form method="POST" action="{{ url_for('storefronts.edit_item', storefront_id=sf.id, item_id=item.id) }}" class="inline">
+                                <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                                <input type="hidden" name="title" value="{{ item.title }}">
+                                <input type="hidden" name="is_active" value="{{ '0' if item.is_active else '1' }}">
+                                <button class="text-xs text-gray-500 hover:text-brand">{{ 'Disable' if item.is_active else 'Enable' }}</button>
+                            </form>
+                            <form method="POST" action="{{ url_for('storefronts.delete_item', storefront_id=sf.id, item_id=item.id) }}" onsubmit="return confirm('Remove this item?')">
+                                <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                                <button class="text-xs text-red-500 hover:text-red-700">Remove</button>
+                            </form>
+                        </div>
+                    </div>
+                    <!-- Inline edit form (hidden by default) -->
+                    <div id="item-edit-{{ item.id }}" class="hidden border-t border-gray-200 dark:border-gray-600 p-3 bg-gray-50 dark:bg-gray-700/50">
+                        <form method="POST" action="{{ url_for('storefronts.edit_item', storefront_id=sf.id, item_id=item.id) }}" class="space-y-3">
+                            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                            <input type="hidden" name="is_active" value="{{ '1' if item.is_active else '0' }}">
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">Title</label>
+                                    <input type="text" name="title" value="{{ item.title }}" required
+                                           class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">Price (0 = pay what you want)</label>
+                                    <input type="number" name="price" step="0.01" min="0" value="{{ item.price }}"
+                                           class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">Description</label>
+                                <input type="text" name="description" value="{{ item.description }}"
+                                       class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">Image URL</label>
+                                    <input type="url" name="image_url" value="{{ item.image_url }}"
+                                           class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">Category</label>
+                                    <input type="text" name="category" value="{{ item.category }}"
+                                           class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-end space-x-2">
+                                <button type="button" onclick="toggleEditItem('item-edit-{{ item.id }}')" class="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700">Cancel</button>
+                                <button type="submit" class="px-4 py-1.5 bg-brand text-white text-xs rounded-lg hover:opacity-90">Save Changes</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-sm text-gray-500 text-center py-4">No items yet. Add your first item above.</p>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {% if sf.is_donation %}
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+            <h3 class="text-lg font-semibold mb-4">Donation Preview</h3>
+            <div class="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                {% if sf.donation_goal_amount and sf.donation_goal_amount > 0 %}
+                <div class="mb-4">
+                    <div class="flex justify-between text-sm mb-1">
+                        <span>{{ sf.donation_goal_label or 'Goal' }}</span>
+                        <span>{{ sf.total_revenue|round(2) }} / {{ sf.donation_goal_amount }} {{ sf.currency }}</span>
+                    </div>
+                    <div class="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-3">
+                        <div class="bg-brand h-3 rounded-full transition-all" style="width: {{ sf.goal_percent }}%"></div>
+                    </div>
+                </div>
+                {% endif %}
+                <div class="flex flex-wrap gap-2">
+                    {% for amt in (sf.donation_presets or [5, 10, 25, 50, 100]) %}
+                    <span class="px-4 py-2 border border-brand/30 rounded-lg text-sm font-medium text-brand">{{ amt }} {{ sf.currency }}</span>
+                    {% endfor %}
+                    {% if sf.donation_allow_custom %}
+                    <span class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-500">Custom</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function toggleEditItem(id) {
+    var el = document.getElementById(id);
+    if (el) el.classList.toggle('hidden');
+}
+</script>
+{% endblock %}

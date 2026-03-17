@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ sf.title }}{% if org %} — {{ org.name }}{% endif %}</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='images/btpay-icon.svg') }}">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: { extend: {
+                colors: {
+                    brand: {{ (sf.brand_color or (org.brand_color if org else "#F89F1B") or "#F89F1B")|tojson }},
+                },
+            }},
+        }
+    </script>
+</head>
+<body class="min-h-full bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100">
+<script>
+    if (localStorage.getItem('btpay_theme') === 'dark' ||
+        (!localStorage.getItem('btpay_theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+    }
+</script>
+
+<div class="min-h-screen flex items-center justify-center px-4 py-12">
+    <div class="w-full max-w-md">
+        <!-- Card -->
+        <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden">
+            {% if sf.hero_image_url %}
+            <div class="h-40 bg-cover bg-center" style="background-image: url('{{ sf.hero_image_url }}')"></div>
+            {% else %}
+            <div class="h-24 bg-gradient-to-br from-brand/30 to-brand/10 flex items-center justify-center">
+                <svg class="w-12 h-12 text-brand/60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
+            </div>
+            {% endif %}
+
+            <div class="p-6">
+                {% if org and org.logo_url %}
+                <img src="{{ org.logo_url }}" alt="{{ org.name }}" class="h-8 mb-3">
+                {% endif %}
+                <h1 class="text-2xl font-bold mb-2">{{ sf.title }}</h1>
+                {% if sf.description %}
+                <p class="text-gray-600 dark:text-gray-400 text-sm mb-4">{{ sf.description }}</p>
+                {% endif %}
+
+                <!-- Goal progress bar -->
+                {% if sf.donation_goal_amount and sf.donation_goal_amount > 0 %}
+                <div class="mb-6">
+                    <div class="flex justify-between text-sm mb-1.5">
+                        <span class="font-medium">{{ sf.donation_goal_label or 'Fundraising Goal' }}</span>
+                        <span class="text-gray-500">{{ sf.total_revenue|round(2) }} / {{ sf.donation_goal_amount }} {{ sf.currency }}</span>
+                    </div>
+                    <div class="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-3">
+                        <div class="bg-brand h-3 rounded-full transition-all duration-500" style="width: {{ sf.goal_percent }}%"></div>
+                    </div>
+                    <div class="text-xs text-gray-400 mt-1">{{ sf.total_orders }} {{ 'donation' if sf.total_orders == 1 else 'donations' }} so far</div>
+                </div>
+                {% endif %}
+
+                <!-- Donation form -->
+                <form method="POST" action="{{ url_for('public_storefront.donate', slug=sf.slug) }}" id="donation-form">
+                    <!-- Preset amounts -->
+                    {% set presets = sf.donation_presets or [5, 10, 25, 50, 100] %}
+                    <div class="grid grid-cols-3 gap-2 mb-4">
+                        {% for amt in presets %}
+                        <button type="button" onclick="selectAmount({{ amt }})"
+                                class="preset-btn px-3 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl text-sm font-semibold hover:border-brand hover:text-brand transition"
+                                data-amount="{{ amt }}">
+                            {{ amt }} {{ sf.currency }}
+                        </button>
+                        {% endfor %}
+                    </div>
+
+                    {% if sf.donation_allow_custom %}
+                    <!-- Custom amount -->
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium mb-1.5">Custom Amount</label>
+                        <div class="relative">
+                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">{{ sf.currency }}</span>
+                            <input type="number" name="amount" id="amount-input" step="0.01" min="0.01" required
+                                   placeholder="0.00"
+                                   class="w-full pl-14 pr-3 py-3 text-lg border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 focus:ring-2 focus:ring-brand focus:border-brand">
+                        </div>
+                    </div>
+                    {% else %}
+                    <input type="hidden" name="amount" id="amount-input" value="{{ presets[0] if presets else 10 }}">
+                    {% endif %}
+
+                    {% if sf.require_name %}
+                    <div class="mb-3">
+                        <label class="block text-sm font-medium mb-1">Your Name</label>
+                        <input type="text" name="name" required
+                               class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+                    </div>
+                    {% endif %}
+
+                    {% if sf.require_email %}
+                    <div class="mb-3">
+                        <label class="block text-sm font-medium mb-1">Email</label>
+                        <input type="email" name="email" required
+                               class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+                    </div>
+                    {% endif %}
+
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium mb-1">Message (optional)</label>
+                        <textarea name="message" rows="2" placeholder="Leave a note..."
+                                  class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700"></textarea>
+                    </div>
+
+                    <button type="submit" id="donate-btn"
+                            class="w-full py-3 bg-brand text-white text-lg font-semibold rounded-xl hover:opacity-90 transition">
+                        {{ sf.button_text or 'Donate' }}
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center mt-6">
+            <p class="text-xs text-gray-400">Powered by <a href="/" class="text-brand hover:underline">BTPay</a></p>
+        </div>
+    </div>
+</div>
+
+<script>
+function selectAmount(amt) {
+    document.getElementById('amount-input').value = amt;
+    // Highlight selected
+    document.querySelectorAll('.preset-btn').forEach(function(btn) {
+        if (parseInt(btn.dataset.amount) === amt) {
+            btn.classList.add('border-brand', 'text-brand', 'bg-brand/5');
+            btn.classList.remove('border-gray-200', 'dark:border-gray-600');
+        } else {
+            btn.classList.remove('border-brand', 'text-brand', 'bg-brand/5');
+            btn.classList.add('border-gray-200', 'dark:border-gray-600');
+        }
+    });
+}
+</script>
+</body>
+</html>

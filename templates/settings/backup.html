@@ -1,0 +1,125 @@
+{% extends 'base.html' %}
+{% block title %}Backup & Restore — BTPay{% endblock %}
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <h2 class="text-2xl font-bold mb-6">Settings</h2>
+    <div class="flex flex-col lg:flex-row gap-6">
+        {% include 'settings/_nav.html' %}
+        <div class="flex-1 space-y-6">
+
+            <!-- Download Backup -->
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+                <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase mb-4">Download Backup</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                    Download a ZIP archive containing all your data — invoices, wallets, users, settings, and payment history.
+                </p>
+
+                <div class="mb-4">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="text-left text-xs text-gray-500 dark:text-gray-400 uppercase">
+                                <th class="pb-2">File</th>
+                                <th class="pb-2 text-right">Size</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                            {% for f in data_files %}
+                            <tr>
+                                <td class="py-1.5 font-mono text-xs">{{ f.name }}</td>
+                                <td class="py-1.5 text-right text-gray-500 font-mono text-xs">{{ "%.1f"|format(f.size / 1024) }} KB</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr class="border-t border-gray-200 dark:border-gray-600">
+                                <td class="pt-2 font-medium text-sm">Total</td>
+                                <td class="pt-2 text-right font-mono text-sm">{{ "%.1f"|format(total_size / 1024) }} KB</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <a href="{{ url_for('settings.backup_download') }}"
+                   class="inline-flex items-center px-4 py-2 bg-brand text-white rounded-lg hover:opacity-90 text-sm font-medium">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                    Download Backup (.zip)
+                </a>
+            </div>
+
+            <!-- Restore from Backup -->
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+                <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase mb-4">Restore from Backup</h3>
+
+                <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-4">
+                    <div class="flex">
+                        <svg class="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+                        </svg>
+                        <div class="ml-3 text-sm text-yellow-800 dark:text-yellow-300">
+                            <p class="font-medium">This will replace all existing data</p>
+                            <p class="mt-1">A safety backup is created automatically before restoring. Only the organization owner can perform a restore. You may need to log in again after restoring.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <form method="POST" action="{{ url_for('settings.backup_restore') }}" enctype="multipart/form-data"
+                      onsubmit="return confirm('Are you sure? This will replace ALL current data with the contents of the uploaded backup.')">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium mb-2">Upload backup file</label>
+                        <input type="file" name="backup_file" accept=".zip" required
+                               class="block w-full text-sm text-gray-500 dark:text-gray-400
+                                      file:mr-4 file:py-2 file:px-4
+                                      file:rounded-lg file:border-0
+                                      file:text-sm file:font-medium
+                                      file:bg-gray-100 file:text-gray-700
+                                      dark:file:bg-gray-700 dark:file:text-gray-300
+                                      hover:file:bg-gray-200 dark:hover:file:bg-gray-600">
+                        <p class="text-xs text-gray-500 mt-1">Only .zip files exported from BTPay are accepted (max 50 MB)</p>
+                    </div>
+
+                    <button type="submit"
+                            class="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                        </svg>
+                        Restore Backup
+                    </button>
+                </form>
+            </div>
+
+            <!-- Automatic Backups -->
+            {% if auto_backups %}
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+                <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase mb-4">Automatic Backups</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                    These backups are created automatically by the server. They are stored locally and rotated.
+                </p>
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-left text-xs text-gray-500 dark:text-gray-400 uppercase">
+                            <th class="pb-2">Timestamp</th>
+                            <th class="pb-2 text-right">Files</th>
+                            <th class="pb-2 text-right">Size</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                        {% for b in auto_backups %}
+                        <tr>
+                            <td class="py-1.5 font-mono text-xs">{{ b.name }}</td>
+                            <td class="py-1.5 text-right text-gray-500 text-xs">{{ b.files }}</td>
+                            <td class="py-1.5 text-right text-gray-500 font-mono text-xs">{{ "%.1f"|format(b.size / 1024) }} KB</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+
+        </div>
+    </div>
+</div>
+{% endblock %}

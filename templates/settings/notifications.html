@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+{% block title %}Notifications — BTPay{% endblock %}
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <h2 class="text-2xl font-bold mb-6">Settings</h2>
+    <div class="flex flex-col lg:flex-row gap-6">
+        {% include 'settings/_nav.html' %}
+        <div class="flex-1">
+            <form method="POST" class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 space-y-6">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+
+                <div>
+                    <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase mb-4">Email Notifications</h3>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Choose which email notifications are sent to customers.</p>
+
+                    <div class="space-y-3">
+                        {% set notifications = [
+                            ('invoice_created', 'Invoice Created', 'Send email when a new invoice is finalized and ready for payment.'),
+                            ('payment_received', 'Payment Received', 'Send email when a payment is detected (unconfirmed).'),
+                            ('payment_confirmed', 'Payment Confirmed', 'Send email when a payment reaches the required confirmations.'),
+                            ('invoice_expired', 'Invoice Expired', 'Send email when an invoice expires without full payment.'),
+                        ] %}
+                        {% for key, label, desc in notifications %}
+                        <label class="flex items-start space-x-3 p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer">
+                            <input type="checkbox" name="{{ key }}" {% if prefs.get(key, true) %}checked{% endif %}
+                                   class="mt-0.5 w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-brand focus:ring-brand">
+                            <div>
+                                <p class="text-sm font-medium">{{ label }}</p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ desc }}</p>
+                            </div>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <button type="submit" class="px-6 py-2 bg-brand text-white rounded-lg hover:opacity-90 text-sm font-medium">
+                        Save Preferences
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

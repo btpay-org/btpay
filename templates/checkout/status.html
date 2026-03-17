@@ -1,0 +1,94 @@
+{% extends 'base.html' %}
+{% block title %}Payment Status — BTPay{% endblock %}
+{% block head %}{% if org and org.custom_checkout_css %}<style>{{ org.custom_checkout_css }}</style>{% endif %}{% endblock %}
+{% macro status_body() %}
+<div class="max-w-lg mx-auto py-8">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
+        <div class="p-6 border-b border-gray-200 dark:border-gray-700 text-center">
+            {% if org and org.logo_url %}
+            <img src="{{ org.logo_url }}" alt="{{ org.name }}" class="h-10 mx-auto mb-3">
+            {% elif org %}
+            <h2 class="text-xl font-bold mb-1">{{ org.name }}</h2>
+            {% endif %}
+            <p class="text-sm text-gray-500 dark:text-gray-400">Invoice {{ invoice.invoice_number }}</p>
+        </div>
+
+        <div class="p-8 text-center">
+            {% if invoice.status == 'paid' %}
+            <div class="w-16 h-16 mx-auto mb-4 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
+                <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+            <h3 class="text-xl font-bold mb-2">Payment Received</h3>
+            <p class="text-gray-500 dark:text-gray-400">Waiting for confirmations...</p>
+            <div class="mt-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <p class="text-sm text-gray-500">{{ confirmations|default(0) }} of {{ required_confirmations|default(1) }} confirmations</p>
+                <div class="mt-2 h-2 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
+                    {% set pct = ((confirmations|default(0)) / (required_confirmations|default(1)) * 100)|int %}
+                    <div class="h-full bg-blue-600 rounded-full" style="width: {{ pct }}%"></div>
+                </div>
+            </div>
+
+            {% elif invoice.status == 'confirmed' %}
+            <div class="w-16 h-16 mx-auto mb-4 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                </svg>
+            </div>
+            <h3 class="text-xl font-bold mb-2">Payment Confirmed</h3>
+            <p class="text-gray-500 dark:text-gray-400">Thank you for your payment!</p>
+            <a href="{{ url_for('checkout.receipt', ref=invoice.ref_number) }}"
+               class="inline-block mt-4 px-6 py-2 bg-brand text-white rounded-lg hover:opacity-90">
+                View Receipt
+            </a>
+
+            {% elif invoice.status == 'expired' %}
+            <div class="w-16 h-16 mx-auto mb-4 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
+                <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+            <h3 class="text-xl font-bold mb-2">Invoice Expired</h3>
+            <p class="text-gray-500 dark:text-gray-400">The payment window has expired. Please contact the merchant.</p>
+
+            {% elif invoice.status == 'cancelled' %}
+            <div class="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
+                <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </div>
+            <h3 class="text-xl font-bold mb-2">Invoice Cancelled</h3>
+            <p class="text-gray-500 dark:text-gray-400">This invoice has been cancelled.</p>
+
+            {% elif invoice.status == 'partial' %}
+            <div class="w-16 h-16 mx-auto mb-4 bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center">
+                <svg class="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+                </svg>
+            </div>
+            <h3 class="text-xl font-bold mb-2">Partial Payment</h3>
+            <p class="text-gray-500 dark:text-gray-400">
+                Received {{ invoice.amount_paid|currency(invoice.currency) }} of {{ invoice.total|currency(invoice.currency) }}.
+            </p>
+            <a href="{{ url_for('checkout.pay', ref=invoice.ref_number) }}"
+               class="inline-block mt-4 px-6 py-2 bg-brand text-white rounded-lg hover:opacity-90">
+                Pay Remaining
+            </a>
+
+            {% else %}
+            <p class="text-gray-500">Status: {{ invoice.status }}</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% if invoice.status in ['paid'] %}
+<script>
+// Auto-refresh for confirmation updates
+setTimeout(function() { location.reload(); }, 30000);
+</script>
+{% endif %}
+{% endmacro %}
+{% block public_content %}{{ status_body() }}{% endblock %}
+{% block content %}{{ status_body() }}{% endblock %}

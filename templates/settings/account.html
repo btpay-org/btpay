@@ -1,0 +1,338 @@
+{% extends 'base.html' %}
+{% block title %}Account — BTPay{% endblock %}
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <h2 class="text-2xl font-bold mb-6">Settings</h2>
+    <div class="flex flex-col lg:flex-row gap-6">
+        {% include 'settings/_nav.html' %}
+        <div class="flex-1 space-y-6">
+
+            <!-- Change Password -->
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+                <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase mb-4">Change Password</h3>
+                <form id="pw-form" class="space-y-4" onsubmit="return changePassword(event)">
+                    <div>
+                        <label for="current_password" class="block text-sm font-medium mb-1">Current Password</label>
+                        <input type="password" id="current_password" name="current_password" required
+                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm"
+                            autocomplete="current-password">
+                    </div>
+                    <div>
+                        <label for="new_password" class="block text-sm font-medium mb-1">New Password</label>
+                        <input type="password" id="new_password" name="new_password" required minlength="8"
+                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm"
+                            autocomplete="new-password">
+                    </div>
+                    <div>
+                        <label for="confirm_password" class="block text-sm font-medium mb-1">Confirm New Password</label>
+                        <input type="password" id="confirm_password" name="confirm_password" required minlength="8"
+                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm"
+                            autocomplete="new-password">
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <button type="submit" class="px-5 py-2 bg-brand text-white rounded-lg hover:opacity-90 text-sm font-medium">
+                            Update Password
+                        </button>
+                        <span id="pw-status" class="text-sm"></span>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Two-Factor Authentication -->
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase">Two-Factor Authentication</h3>
+                        <p class="text-xs text-gray-400 mt-1">Add an extra layer of security using an authenticator app.</p>
+                    </div>
+                    {% if user.totp_enabled %}
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                        Enabled
+                    </span>
+                    {% else %}
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400">
+                        Disabled
+                    </span>
+                    {% endif %}
+                </div>
+
+                {% if user.totp_enabled %}
+                <!-- TOTP is enabled — show disable form -->
+                <div id="totp-enabled-section">
+                    <div class="flex items-center space-x-3 mb-4 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                        <svg class="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                        </svg>
+                        <p class="text-sm text-green-700 dark:text-green-300">Your account is protected with two-factor authentication.</p>
+                    </div>
+                    <form onsubmit="return disableTotp(event)" class="space-y-3">
+                        <div>
+                            <label for="disable_totp_code" class="block text-sm font-medium mb-1">Enter current code to disable</label>
+                            <input type="text" id="disable_totp_code" name="totp_code" required maxlength="6" pattern="\d{6}"
+                                inputmode="numeric" autocomplete="one-time-code"
+                                class="w-48 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm font-mono tracking-widest text-center"
+                                placeholder="000000">
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <button type="submit" class="px-5 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium">
+                                Disable 2FA
+                            </button>
+                            <span id="totp-disable-status" class="text-sm"></span>
+                        </div>
+                    </form>
+                </div>
+                {% else %}
+                <!-- TOTP is disabled — show setup flow -->
+                <div id="totp-disabled-section">
+                    <button type="button" onclick="startTotpSetup()"
+                        class="px-5 py-2 bg-brand text-white rounded-lg hover:opacity-90 text-sm font-medium">
+                        Set Up 2FA
+                    </button>
+                </div>
+
+                <div id="totp-setup-section" class="hidden mt-4 space-y-4">
+                    <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
+                        <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                            Scan this QR code with your authenticator app (Google Authenticator, Authy, 1Password, etc.):
+                        </p>
+                        <div class="flex flex-col sm:flex-row items-center sm:items-start gap-6">
+                            <div class="bg-white p-3 rounded-lg shadow-sm">
+                                <img id="totp-qr" src="" alt="TOTP QR Code" class="w-48 h-48">
+                            </div>
+                            <div class="space-y-3 flex-1">
+                                <div>
+                                    <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Manual entry key</p>
+                                    <div class="flex items-center space-x-2">
+                                        <code id="totp-secret-display" class="bg-gray-100 dark:bg-gray-700 px-3 py-1.5 rounded text-sm font-mono select-all"></code>
+                                        <button type="button" onclick="copySecret()" class="text-xs text-brand hover:underline">Copy</button>
+                                    </div>
+                                </div>
+                                <form onsubmit="return enableTotp(event)" class="space-y-3">
+                                    <input type="hidden" id="totp-secret" name="secret" value="">
+                                    <div>
+                                        <label for="enable_totp_code" class="block text-sm font-medium mb-1">Enter the 6-digit code to verify</label>
+                                        <input type="text" id="enable_totp_code" name="totp_code" required maxlength="6" pattern="\d{6}"
+                                            inputmode="numeric" autocomplete="one-time-code"
+                                            class="w-48 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm font-mono tracking-widest text-center"
+                                            placeholder="000000">
+                                    </div>
+                                    <div class="flex items-center space-x-3">
+                                        <button type="submit" class="px-5 py-2 bg-brand text-white rounded-lg hover:opacity-90 text-sm font-medium">
+                                            Enable 2FA
+                                        </button>
+                                        <button type="button" onclick="cancelTotpSetup()" class="px-5 py-2 text-gray-500 hover:text-gray-700 text-sm">
+                                            Cancel
+                                        </button>
+                                        <span id="totp-enable-status" class="text-sm"></span>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Account Info (read-only) -->
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+                <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase mb-4">Account Info</h3>
+                <dl class="space-y-3 text-sm">
+                    <div class="flex justify-between">
+                        <dt class="text-gray-500 dark:text-gray-400">Email</dt>
+                        <dd class="font-medium">{{ user.email }}</dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-gray-500 dark:text-gray-400">Name</dt>
+                        <dd class="font-medium">{{ user.full_name }}</dd>
+                    </div>
+                    {% if user.last_login_at %}
+                    <div class="flex justify-between">
+                        <dt class="text-gray-500 dark:text-gray-400">Last login</dt>
+                        <dd class="font-medium" id="last-login-ts" data-ts="{{ user.last_login_at | int }}"></dd>
+                    </div>
+                    {% endif %}
+                </dl>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    // Format last login timestamp
+    var tsEl = document.getElementById('last-login-ts');
+    if (tsEl) {
+        var ts = parseInt(tsEl.dataset.ts, 10);
+        if (ts > 0) {
+            var d = new Date(ts * 1000);
+            tsEl.textContent = d.toISOString().replace('T', ' ').substring(0, 16) + ' UTC';
+        }
+    }
+
+    var totpSecret = '';
+
+    // ---- Password Change ----
+    window.changePassword = function(e) {
+        e.preventDefault();
+        var form = document.getElementById('pw-form');
+        var status = document.getElementById('pw-status');
+        var newPw = document.getElementById('new_password').value;
+        var confirmPw = document.getElementById('confirm_password').value;
+
+        if (newPw !== confirmPw) {
+            status.textContent = 'Passwords do not match';
+            status.className = 'text-sm text-red-600';
+            return false;
+        }
+
+        if (newPw.length < 8) {
+            status.textContent = 'Password must be at least 8 characters';
+            status.className = 'text-sm text-red-600';
+            return false;
+        }
+
+        status.textContent = 'Saving...';
+        status.className = 'text-sm text-gray-400 animate-pulse';
+
+        fetch('{{ url_for("auth.change_password") }}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                current_password: document.getElementById('current_password').value,
+                new_password: newPw,
+            })
+        })
+        .then(function(r) { return r.json().then(function(d) { return {ok: r.ok, data: d}; }); })
+        .then(function(res) {
+            if (res.ok && res.data.ok) {
+                status.textContent = 'Password updated successfully';
+                status.className = 'text-sm text-green-600';
+                form.reset();
+            } else {
+                status.textContent = res.data.error || 'Failed to update password';
+                status.className = 'text-sm text-red-600';
+            }
+        })
+        .catch(function(err) {
+            status.textContent = 'Error: ' + err.message;
+            status.className = 'text-sm text-red-600';
+        });
+        return false;
+    };
+
+    // ---- TOTP Setup ----
+    window.startTotpSetup = function() {
+        document.getElementById('totp-disabled-section').classList.add('hidden');
+        document.getElementById('totp-setup-section').classList.remove('hidden');
+
+        fetch('{{ url_for("auth.totp_setup") }}')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            totpSecret = data.secret;
+            document.getElementById('totp-qr').src = data.qr_code;
+            document.getElementById('totp-secret-display').textContent = data.secret;
+            document.getElementById('totp-secret').value = data.secret;
+        })
+        .catch(function(err) {
+            var status = document.getElementById('totp-enable-status');
+            status.textContent = 'Failed to load QR code: ' + err.message;
+            status.className = 'text-sm text-red-600';
+        });
+    };
+
+    window.cancelTotpSetup = function() {
+        document.getElementById('totp-disabled-section').classList.remove('hidden');
+        document.getElementById('totp-setup-section').classList.add('hidden');
+    };
+
+    window.copySecret = function() {
+        var el = document.getElementById('totp-secret-display');
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(el.textContent);
+        } else {
+            var range = document.createRange();
+            range.selectNodeContents(el);
+            var sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+            document.execCommand('copy');
+        }
+    };
+
+    window.enableTotp = function(e) {
+        e.preventDefault();
+        var code = document.getElementById('enable_totp_code').value.trim();
+        var status = document.getElementById('totp-enable-status');
+
+        if (!/^\d{6}$/.test(code)) {
+            status.textContent = 'Enter a 6-digit code';
+            status.className = 'text-sm text-red-600';
+            return false;
+        }
+
+        status.textContent = 'Verifying...';
+        status.className = 'text-sm text-gray-400 animate-pulse';
+
+        fetch('{{ url_for("auth.totp_enable") }}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                secret: document.getElementById('totp-secret').value,
+                totp_code: code,
+            })
+        })
+        .then(function(r) { return r.json().then(function(d) { return {ok: r.ok, data: d}; }); })
+        .then(function(res) {
+            if (res.ok && res.data.ok) {
+                window.location.reload();
+            } else {
+                status.textContent = res.data.error || 'Invalid code';
+                status.className = 'text-sm text-red-600';
+            }
+        })
+        .catch(function(err) {
+            status.textContent = 'Error: ' + err.message;
+            status.className = 'text-sm text-red-600';
+        });
+        return false;
+    };
+
+    // ---- TOTP Disable ----
+    window.disableTotp = function(e) {
+        e.preventDefault();
+        var code = document.getElementById('disable_totp_code').value.trim();
+        var status = document.getElementById('totp-disable-status');
+
+        if (!/^\d{6}$/.test(code)) {
+            status.textContent = 'Enter a 6-digit code';
+            status.className = 'text-sm text-red-600';
+            return false;
+        }
+
+        status.textContent = 'Disabling...';
+        status.className = 'text-sm text-gray-400 animate-pulse';
+
+        fetch('{{ url_for("auth.totp_disable") }}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({totp_code: code})
+        })
+        .then(function(r) { return r.json().then(function(d) { return {ok: r.ok, data: d}; }); })
+        .then(function(res) {
+            if (res.ok && res.data.ok) {
+                window.location.reload();
+            } else {
+                status.textContent = res.data.error || 'Invalid code';
+                status.className = 'text-sm text-red-600';
+            }
+        })
+        .catch(function(err) {
+            status.textContent = 'Error: ' + err.message;
+            status.className = 'text-sm text-red-600';
+        });
+        return false;
+    };
+})();
+</script>
+{% endblock %}

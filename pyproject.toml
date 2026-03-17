@@ -1,0 +1,64 @@
+[project]
+name = "btpay"
+version = "0.1.0"
+description = "Self-hosted Bitcoin payment processor"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [{ name = "NVK" }]
+keywords = ["bitcoin", "payments", "invoicing", "self-hosted"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Framework :: Flask",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Office/Business :: Financial",
+]
+
+[project.urls]
+Homepage = "https://btpay.org"
+Repository = "https://github.com/btpay-org/btpay"
+Documentation = "https://github.com/btpay-org/btpay/tree/master/docs"
+
+dependencies = [
+    "flask>=3.0",
+    "gunicorn>=21.0",
+    "pyjwt>=2.0",
+    "pyotp>=2.9",
+    "qrcode>=7.0",
+    "reportlab>=4.0",
+    "requests>=2.31",
+    "cffi>=1.16",
+    "PyNaCl>=1.5",
+    "argon2-cffi>=23.0",
+    "pendulum>=3.0",
+    "pillow>=10.0",
+    "jinja2>=3.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov",
+]
+
+[project.scripts]
+btpay = "btpay.cli:main"
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["btpay*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = [
+    "ignore::DeprecationWarning:btpay",
+    "ignore::DeprecationWarning:jwt",
+]

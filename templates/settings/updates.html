@@ -1,0 +1,193 @@
+{% extends 'base.html' %}
+{% block title %}Software Update — BTPay{% endblock %}
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <h2 class="text-2xl font-bold mb-6">Settings</h2>
+    <div class="flex flex-col lg:flex-row gap-6">
+        {% include 'settings/_nav.html' %}
+        <div class="flex-1 space-y-6">
+
+            <!-- Current Version -->
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+                <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase mb-4">Current Version</h3>
+                <dl class="space-y-3 text-sm">
+                    <div class="flex justify-between">
+                        <dt class="text-gray-500">Version</dt>
+                        <dd class="font-mono">{{ current_version }}</dd>
+                    </div>
+                    {% if git_info %}
+                    {% if git_info.commit %}
+                    <div class="flex justify-between">
+                        <dt class="text-gray-500">Git Commit</dt>
+                        <dd class="font-mono text-xs">{{ git_info.commit[:12] }}</dd>
+                    </div>
+                    {% endif %}
+                    {% if git_info.branch %}
+                    <div class="flex justify-between">
+                        <dt class="text-gray-500">Branch</dt>
+                        <dd class="font-mono text-xs">{{ git_info.branch }}</dd>
+                    </div>
+                    {% endif %}
+                    {% if git_info.tag %}
+                    <div class="flex justify-between">
+                        <dt class="text-gray-500">Tag</dt>
+                        <dd class="font-mono text-xs">{{ git_info.tag }}</dd>
+                    </div>
+                    {% endif %}
+                    {% endif %}
+                    <div class="flex justify-between">
+                        <dt class="text-gray-500">Git Available</dt>
+                        <dd>
+                            {% if git_available %}
+                            <span class="px-2 py-0.5 text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 rounded">Yes</span>
+                            {% else %}
+                            <span class="px-2 py-0.5 text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 rounded">No</span>
+                            {% endif %}
+                        </dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-gray-500">Updates Allowed</dt>
+                        <dd>
+                            {% if update_allowed %}
+                            <span class="px-2 py-0.5 text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 rounded">Yes</span>
+                            {% else %}
+                            <span class="px-2 py-0.5 text-xs bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 rounded">Disabled</span>
+                            {% endif %}
+                        </dd>
+                    </div>
+                </dl>
+            </div>
+
+            <!-- Check for Updates -->
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+                <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase mb-4">Check for Updates</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                    Query GitHub for new releases and tags. Your current version is <span class="font-mono font-medium">{{ current_version }}</span>.
+                </p>
+
+                <button type="button"
+                        hx-post="{{ url_for('settings.updates_check') }}"
+                        hx-target="#updates-result"
+                        hx-indicator="#updates-spinner"
+                        hx-vals='{"_csrf_token": "{{ csrf_token }}"}'
+                        class="inline-flex items-center px-4 py-2 bg-brand text-white rounded-lg hover:opacity-90 text-sm font-medium">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                    Check for Updates
+                </button>
+
+                <div id="updates-spinner" class="htmx-indicator mt-3">
+                    <div class="flex items-center text-sm text-gray-500">
+                        <svg class="animate-spin h-4 w-4 mr-2 text-brand" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Checking for updates...
+                    </div>
+                </div>
+
+                <div id="updates-result" class="mt-4"></div>
+            </div>
+
+            <!-- Upload Update -->
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+                <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase mb-4">Upload Update</h3>
+
+                <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-4">
+                    <div class="flex">
+                        <svg class="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+                        </svg>
+                        <div class="ml-3 text-sm text-yellow-800 dark:text-yellow-300">
+                            <p class="font-medium">This will replace application code</p>
+                            <p class="mt-1">A backup of the current code and data is created automatically before applying the update. The server will restart after a successful update.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <form method="POST" action="{{ url_for('settings.updates_apply') }}" enctype="multipart/form-data"
+                      onsubmit="return confirm('Are you sure? This will update the application code and restart the server.')">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                    <input type="hidden" name="method" value="zip">
+
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium mb-2">Upload BTPay release (.zip)</label>
+                        <input type="file" name="zipfile" accept=".zip" required
+                               class="block w-full text-sm text-gray-500 dark:text-gray-400
+                                      file:mr-4 file:py-2 file:px-4
+                                      file:rounded-lg file:border-0
+                                      file:text-sm file:font-medium
+                                      file:bg-gray-100 file:text-gray-700
+                                      dark:file:bg-gray-700 dark:file:text-gray-300
+                                      hover:file:bg-gray-200 dark:hover:file:bg-gray-600">
+                        <p class="text-xs text-gray-500 mt-1">Only official BTPay release ZIP files are accepted</p>
+                    </div>
+
+                    <button type="submit"
+                            class="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                        </svg>
+                        Upload &amp; Apply Update
+                    </button>
+                </form>
+            </div>
+
+            <!-- Update History -->
+            {% if update_history %}
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+                <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase mb-4">Update History</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                    Previous updates applied to this instance. You can rollback to any previous version if a backup is available.
+                </p>
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-left text-xs text-gray-500 dark:text-gray-400 uppercase">
+                            <th class="pb-2">Date</th>
+                            <th class="pb-2">From</th>
+                            <th class="pb-2">To</th>
+                            <th class="pb-2">Method</th>
+                            <th class="pb-2 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                        {% for entry in update_history %}
+                        <tr>
+                            <td class="py-2 font-mono text-xs">{{ entry.date }}</td>
+                            <td class="py-2 font-mono text-xs">{{ entry.from_version }}</td>
+                            <td class="py-2 font-mono text-xs">{{ entry.to_version }}</td>
+                            <td class="py-2 text-xs">
+                                {% if entry.method == 'git' %}
+                                <span class="px-2 py-0.5 bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 rounded">git</span>
+                                {% else %}
+                                <span class="px-2 py-0.5 bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400 rounded">zip</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-2 text-right">
+                                {% if entry.code_backup %}
+                                <form method="POST" action="{{ url_for('settings.updates_rollback') }}" class="inline"
+                                      onsubmit="return confirm('Rollback to {{ entry.from_version }}? The server will restart.')">
+                                    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                                    <input type="hidden" name="code_backup" value="{{ entry.code_backup }}">
+                                    <input type="hidden" name="data_backup" value="{{ entry.data_backup|default('') }}">
+                                    <button type="submit"
+                                            class="text-xs text-red-600 dark:text-red-400 hover:underline font-medium">
+                                        Rollback
+                                    </button>
+                                </form>
+                                {% else %}
+                                <span class="text-xs text-gray-400">No backup</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+
+        </div>
+    </div>
+</div>
+{% endblock %}

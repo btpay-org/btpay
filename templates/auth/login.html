@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+{% block title %}Login — BTPay{% endblock %}
+{% block public_content %}
+<div class="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
+    <div class="w-full max-w-md">
+        <div class="text-center mb-8">
+            <img src="{{ url_for('static', filename='images/btpay-logo.svg') }}" alt="BTPay" class="h-12 mx-auto mb-3">
+            <p class="mt-2 text-gray-600 dark:text-gray-400">Sign in to your account</p>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-8">
+            <form method="POST" action="{{ url_for('auth.login') }}" class="space-y-5">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                <div>
+                    <label for="email" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
+                    <input type="{% if demo_mode is defined and demo_mode %}text{% else %}email{% endif %}" id="email" name="email" required autofocus
+                           {% if demo_mode is defined and demo_mode %}value="demo"{% endif %}
+                           class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-brand focus:border-transparent">
+                </div>
+                <div>
+                    <label for="password" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Password</label>
+                    <input type="password" id="password" name="password" required
+                           {% if demo_mode is defined and demo_mode %}value="demo"{% endif %}
+                           class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-brand focus:border-transparent">
+                </div>
+                <button type="submit"
+                        class="w-full py-2.5 px-4 bg-brand text-white font-medium rounded-lg hover:opacity-90 focus:ring-2 focus:ring-brand focus:ring-offset-2">
+                    Sign In
+                </button>
+            </form>
+            {% if demo_mode is defined and demo_mode %}
+            <div class="mt-6 p-3 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded-lg">
+                <p class="text-sm font-medium text-amber-800 dark:text-amber-200 mb-1">Demo Credentials</p>
+                <p class="text-xs text-amber-700 dark:text-amber-300">
+                    <strong>Admin:</strong> demo / demo<br>
+                    <strong>Viewer:</strong> viewer@demo.btpay / demo
+                </p>
+            </div>
+            {% else %}
+            {% if allow_register %}
+            <p class="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
+                No account? <a href="{{ url_for('auth.register_page') }}" class="text-brand hover:underline">Register</a>
+            </p>
+            {% endif %}
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

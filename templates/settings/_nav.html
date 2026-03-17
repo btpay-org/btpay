@@ -1,0 +1,55 @@
+<nav class="lg:w-48 flex-shrink-0">
+    <ul class="space-y-1">
+        <li>
+            <a href="{{ url_for('settings.general') }}"
+               class="block px-3 py-2 text-sm rounded-lg {% if request.endpoint == 'settings.general' %}bg-brand/10 text-brand font-medium{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700{% endif %}">
+                General
+            </a>
+        </li>
+
+        <!-- Payment Connectors group -->
+        <li class="pt-2">
+            <p class="px-3 py-1 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Payment Connectors</p>
+            <ul class="mt-1 space-y-0.5 ml-2 border-l border-gray-200 dark:border-gray-700">
+                {% set connector_tabs = [
+                    ('settings.connectors_bitcoin', 'Bitcoin Wallets'),
+                    ('settings.connectors_electrum', 'Electrum Server'),
+                    ('settings.connectors_wire', 'Wire Transfer'),
+                    ('settings.connectors_stablecoins', 'Stablecoins'),
+                    ('settings.stablecoin_rpc', 'Stablecoin RPC'),
+                    ('settings.connectors_btcpay', 'BTCPay Server'),
+                    ('settings.connectors_lnbits', 'LNbits'),
+                ] %}
+                {% for endpoint, label in connector_tabs %}
+                <li>
+                    <a href="{{ url_for(endpoint) }}"
+                       class="block pl-3 pr-3 py-1.5 text-sm rounded-r-lg {% if request.endpoint == endpoint %}bg-brand/10 text-brand font-medium{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700{% endif %}">
+                        {{ label }}
+                    </a>
+                </li>
+                {% endfor %}
+            </ul>
+        </li>
+
+        {% set other_tabs = [
+            ('settings.branding', 'Branding'),
+            ('settings.team', 'Team'),
+            ('settings.api_keys', 'API Keys'),
+            ('settings.webhooks', 'Webhooks'),
+            ('settings.notifications', 'Notifications'),
+            ('settings.email', 'Email'),
+            ('settings.updates', 'Software Update'),
+            ('settings.server_info', 'Server Info'),
+            ('settings.backup', 'Backup & Restore'),
+            ('settings.account', 'Account'),
+        ] %}
+        {% for endpoint, label in other_tabs %}
+        <li>
+            <a href="{{ url_for(endpoint) }}"
+               class="block px-3 py-2 text-sm rounded-lg {% if request.endpoint == endpoint %}bg-brand/10 text-brand font-medium{% else %}text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700{% endif %}">
+                {{ label }}
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+</nav>

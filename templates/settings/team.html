@@ -1,0 +1,134 @@
+{% extends 'base.html' %}
+{% block title %}Team — BTPay{% endblock %}
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <h2 class="text-2xl font-bold mb-6">Settings</h2>
+    <div class="flex flex-col lg:flex-row gap-6">
+        {% include 'settings/_nav.html' %}
+        <div class="flex-1 space-y-6">
+            <!-- Members list -->
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                    <h3 class="font-medium">Team Members</h3>
+                </div>
+                <table class="w-full">
+                    <thead>
+                        <tr class="text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase border-b border-gray-200 dark:border-gray-700">
+                            <th class="px-6 py-3">Member</th>
+                            <th class="px-6 py-3">Role</th>
+                            <th class="px-6 py-3">Joined</th>
+                            <th class="px-6 py-3"></th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                        {% for m in members %}
+                        <tr>
+                            <td class="px-6 py-3">
+                                <p class="font-medium">{{ m.user.full_name if m.user else 'Unknown' }}</p>
+                                <p class="text-sm text-gray-500">{{ m.user.email if m.user else '' }}</p>
+                            </td>
+                            <td class="px-6 py-3">
+                                <span class="px-2 py-1 text-xs rounded {% if m.role == 'owner' %}bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400{% elif m.role == 'admin' %}bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400{% else %}bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400{% endif %}">
+                                    {{ m.role|capitalize }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-3 text-sm text-gray-500">{{ m.created_at|time_ago }}</td>
+                            <td class="px-6 py-3 text-right">
+                                {% if m.role != 'owner' and is_owner %}
+                                <form method="POST" action="{{ url_for('settings.remove_member', member_id=m.id) }}" class="inline"
+                                      onsubmit="return confirm('Remove this team member?')">
+                                    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                                    <button type="submit" class="text-sm text-red-600 hover:text-red-800">Remove</button>
+                                </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Generate Invite Link -->
+            {% if is_owner or is_admin %}
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+                <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase mb-4">Invite Link</h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Generate a link to share with someone — they register through it and auto-join your org. No email setup needed.</p>
+                <form method="POST" action="{{ url_for('settings.generate_invite_link') }}" class="flex items-end space-x-3 mb-4">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Role</label>
+                        <select name="link_role" class="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+                            <option value="viewer">Viewer</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Expires in</label>
+                        <select name="link_hours" class="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+                            <option value="24">24 hours</option>
+                            <option value="72" selected>3 days</option>
+                            <option value="168">7 days</option>
+                            <option value="720">30 days</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="px-4 py-2 bg-brand text-white rounded-lg hover:opacity-90 text-sm font-medium whitespace-nowrap">
+                        Generate Link
+                    </button>
+                </form>
+
+                {% if invite_url %}
+                <div class="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 mt-4">
+                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                        Invite link ({{ invite_role|capitalize }}, single use)
+                    </label>
+                    <div class="flex items-center space-x-2">
+                        <input id="invite-url" type="text" readonly value="{{ invite_url }}"
+                               class="flex-1 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-mono select-all">
+                        <button onclick="copyInviteLink()" type="button"
+                                class="px-3 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 text-sm font-medium">
+                            Copy
+                        </button>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-2">Share this link privately. Anyone with it can register and join your organization.</p>
+                </div>
+                <script>
+                function copyInviteLink() {
+                    var el = document.getElementById('invite-url');
+                    el.select();
+                    navigator.clipboard.writeText(el.value).then(function() {
+                        el.nextElementSibling.textContent = 'Copied!';
+                        setTimeout(function() { el.nextElementSibling.textContent = 'Copy'; }, 2000);
+                    });
+                }
+                </script>
+                {% endif %}
+            </div>
+
+            <!-- Add Existing User -->
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+                <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase mb-4">Add Existing User</h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Add someone who already has a BTPay account by email.</p>
+                <form method="POST" action="{{ url_for('settings.invite_member') }}" class="flex items-end space-x-3">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                    <div class="flex-1">
+                        <label class="block text-sm font-medium mb-1">Email</label>
+                        <input type="email" name="email" required placeholder="colleague@example.com"
+                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Role</label>
+                        <select name="role" class="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+                            <option value="viewer">Viewer</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-sm font-medium">
+                        Add
+                    </button>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

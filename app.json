@@ -1,0 +1,52 @@
+{
+  "name": "BTPay",
+  "description": "Self-hosted Bitcoin payment processor. No third parties. No monthly fees.",
+  "repository": "https://github.com/btpay-org/btpay",
+  "keywords": ["bitcoin", "payments", "invoicing", "self-hosted"],
+  "env": {
+    "BTPAY_DEMO": {
+      "description": "Run in demo mode with sample data (set to 1 for demo)",
+      "value": "0"
+    },
+    "BTPAY_SECRET_KEY": {
+      "description": "Flask secret key",
+      "generator": "secret"
+    },
+    "BTPAY_JWT_ADMIN": {
+      "description": "JWT signing key for admin tokens",
+      "generator": "secret"
+    },
+    "BTPAY_JWT_LOGIN": {
+      "description": "JWT signing key for login tokens",
+      "generator": "secret"
+    },
+    "BTPAY_JWT_API": {
+      "description": "JWT signing key for API tokens",
+      "generator": "secret"
+    },
+    "BTPAY_JWT_INVITE": {
+      "description": "JWT signing key for invite tokens",
+      "generator": "secret"
+    },
+    "BTPAY_REFNUM_KEY": {
+      "description": "NaCl SecretBox key for reference numbers (32 bytes hex)",
+      "generator": "secret"
+    },
+    "BTPAY_REFNUM_NONCE": {
+      "description": "NaCl SecretBox nonce for reference numbers (24 bytes hex)",
+      "generator": "secret"
+    }
+  },
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "basic"
+    }
+  },
+  "buildpacks": [
+    { "url": "heroku/python" }
+  ],
+  "scripts": {
+    "postdeploy": ""
+  }
+}

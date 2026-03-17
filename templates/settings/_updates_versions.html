@@ -1,0 +1,82 @@
+{% if not releases and not tags %}
+<div class="text-sm text-gray-500 dark:text-gray-400">
+    No releases or tags found. You may already be on the latest version.
+</div>
+{% else %}
+
+{% if releases %}
+<h4 class="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3">Releases</h4>
+<div class="space-y-2 mb-6">
+    {% for release in releases %}
+    <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-3">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <span class="font-mono text-sm font-medium">{{ release.tag_name }}</span>
+                {% if release.tag_name == current_version or release.tag_name == 'v' + current_version %}
+                <span class="px-2 py-0.5 text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 rounded font-medium">Current</span>
+                {% endif %}
+                {% if release.prerelease %}
+                <span class="px-2 py-0.5 text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 rounded">Pre-release</span>
+                {% endif %}
+                {% if release.published_at %}
+                <span class="text-xs text-gray-400">{{ release.published_at[:10] }}</span>
+                {% endif %}
+            </div>
+            {% if release.tag_name != current_version and release.tag_name != 'v' + current_version %}
+            <form method="POST" action="{{ url_for('settings.updates_apply') }}" class="inline"
+                  onsubmit="return confirm('Update to {{ release.tag_name }}? A backup will be created and the server will restart.')">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="method" value="git">
+                <input type="hidden" name="version" value="{{ release.tag_name }}">
+                <button type="submit"
+                        class="inline-flex items-center px-3 py-1.5 bg-brand text-white rounded-lg hover:opacity-90 text-xs font-medium">
+                    Update
+                </button>
+            </form>
+            {% endif %}
+        </div>
+        {% if release.body %}
+        <details class="mt-2">
+            <summary class="text-xs text-gray-500 dark:text-gray-400 cursor-pointer hover:text-gray-700 dark:hover:text-gray-300">Release notes</summary>
+            <div class="mt-2 text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap bg-gray-50 dark:bg-gray-900 rounded p-3 max-h-48 overflow-y-auto">{{ release.body }}</div>
+        </details>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if tags %}
+<h4 class="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-3">Tags</h4>
+<div class="space-y-2">
+    {% for tag in tags %}
+    <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-3">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <span class="font-mono text-sm">{{ tag.name }}</span>
+                {% if tag.name == current_version or tag.name == 'v' + current_version %}
+                <span class="px-2 py-0.5 text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 rounded font-medium">Current</span>
+                {% endif %}
+                {% if tag.date %}
+                <span class="text-xs text-gray-400">{{ tag.date[:10] }}</span>
+                {% endif %}
+            </div>
+            {% if tag.name != current_version and tag.name != 'v' + current_version %}
+            <form method="POST" action="{{ url_for('settings.updates_apply') }}" class="inline"
+                  onsubmit="return confirm('Update to {{ tag.name }}? A backup will be created and the server will restart.')">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="method" value="git">
+                <input type="hidden" name="version" value="{{ tag.name }}">
+                <button type="submit"
+                        class="inline-flex items-center px-3 py-1.5 bg-brand text-white rounded-lg hover:opacity-90 text-xs font-medium">
+                    Update
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% endif %}

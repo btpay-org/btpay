@@ -1,0 +1,50 @@
+{% extends 'setup/base.html' %}
+{% block wizard_content %}
+<div class="text-center space-y-6">
+    <div>
+        <div class="w-16 h-16 mx-auto rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mb-4">
+            <svg class="w-8 h-8 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+        </div>
+        <h3 class="text-xl font-semibold">You're all set!</h3>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Your BTPay instance is ready to use.</p>
+    </div>
+
+    <!-- Summary -->
+    <div class="text-left bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 space-y-3">
+        <div class="flex items-center gap-3">
+            {% if steps.get('org') %}
+            <svg class="w-5 h-5 text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            <span class="text-sm">Organization configured</span>
+            {% else %}
+            <svg class="w-5 h-5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/></svg>
+            <span class="text-sm text-gray-500">Organization — <a href="{{ url_for('setup.org') }}" class="text-brand hover:underline">configure</a></span>
+            {% endif %}
+        </div>
+        <div class="flex items-center gap-3">
+            {% if steps.get('connector') %}
+            <svg class="w-5 h-5 text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            <span class="text-sm">Payment connector added</span>
+            {% else %}
+            <svg class="w-5 h-5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/></svg>
+            <span class="text-sm text-gray-500">Payment connector — <a href="{{ url_for('setup.choose_connector') }}" class="text-brand hover:underline">add one</a></span>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="flex flex-col sm:flex-row items-center justify-center gap-3 pt-4">
+        <form method="POST" action="{{ url_for('setup.finish') }}" class="inline">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+            <button type="submit"
+                    class="px-6 py-2.5 bg-brand text-white rounded-lg hover:opacity-90 text-sm font-medium">
+                Go to Dashboard
+            </button>
+        </form>
+        <a href="{{ url_for('setup.choose_connector') }}"
+           class="px-6 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-sm font-medium">
+            Add Another Connector
+        </a>
+    </div>
+</div>
+{% endblock %}

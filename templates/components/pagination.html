@@ -1,0 +1,32 @@
+{# Usage: {% include 'components/pagination.html' with context #}
+{# Expects: total, limit, offset, base_url #}
+{% if total > limit %}
+{% set pages = (total + limit - 1) // limit %}
+{% set current_page = offset // limit + 1 %}
+{% set sep = '&' if '?' in base_url else '?' %}
+<nav class="flex items-center justify-between mt-6">
+    <p class="text-sm text-gray-600 dark:text-gray-400">
+        Showing {{ offset + 1 }}&ndash;{{ [offset + limit, total]|min }} of {{ total }}
+    </p>
+    <div class="flex space-x-1">
+        {% if current_page > 1 %}
+        <a href="{{ base_url }}{{ sep }}offset={{ (current_page - 2) * limit }}&limit={{ limit }}"
+           class="px-3 py-1 text-sm rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700">Prev</a>
+        {% endif %}
+        {% for p in range(1, pages + 1) %}
+        {% if p == current_page %}
+        <span class="px-3 py-1 text-sm rounded bg-brand text-white">{{ p }}</span>
+        {% elif p <= 3 or p >= pages - 1 or (p >= current_page - 1 and p <= current_page + 1) %}
+        <a href="{{ base_url }}{{ sep }}offset={{ (p - 1) * limit }}&limit={{ limit }}"
+           class="px-3 py-1 text-sm rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700">{{ p }}</a>
+        {% elif p == 4 or p == pages - 2 %}
+        <span class="px-2 py-1 text-gray-400">&hellip;</span>
+        {% endif %}
+        {% endfor %}
+        {% if current_page < pages %}
+        <a href="{{ base_url }}{{ sep }}offset={{ current_page * limit }}&limit={{ limit }}"
+           class="px-3 py-1 text-sm rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700">Next</a>
+        {% endif %}
+    </div>
+</nav>
+{% endif %}

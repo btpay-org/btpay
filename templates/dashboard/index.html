@@ -1,0 +1,93 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard — BTPay{% endblock %}
+{% block content %}
+<div class="mb-6">
+    <h2 class="text-2xl font-bold">Dashboard</h2>
+</div>
+
+{% if current_org and not current_org.setup_complete %}
+<a href="{{ url_for('setup.index') }}"
+   class="block mb-6 p-4 bg-brand/10 border border-brand/20 rounded-xl hover:bg-brand/15 transition-colors">
+    <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-full bg-brand/20 flex items-center justify-center">
+                <svg class="w-4 h-4 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            </div>
+            <div>
+                <span class="font-medium text-sm">Continue setting up BTPay</span>
+                <span class="text-xs text-gray-500 dark:text-gray-400 ml-2">Complete the setup wizard to get started</span>
+            </div>
+        </div>
+        <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+    </div>
+</a>
+{% endif %}
+
+<!-- Stats cards -->
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+        <p class="text-sm text-gray-500 dark:text-gray-400">Total Revenue</p>
+        <p class="text-2xl font-bold mt-1">{{ total_revenue|currency(currency) }}</p>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+        <p class="text-sm text-gray-500 dark:text-gray-400">Pending Invoices</p>
+        <p class="text-2xl font-bold mt-1">{{ pending_count }}</p>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+        <p class="text-sm text-gray-500 dark:text-gray-400">Paid (30 days)</p>
+        <p class="text-2xl font-bold mt-1">{{ paid_30d|currency(currency) }}</p>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+        <p class="text-sm text-gray-500 dark:text-gray-400">BTC Rate</p>
+        <p class="text-2xl font-bold mt-1">
+            {% if btc_rate %}{{ btc_rate|currency(currency) }}{% else %}&mdash;{% endif %}
+        </p>
+    </div>
+</div>
+
+<!-- Recent invoices -->
+<div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm">
+    <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+        <h3 class="font-semibold">Recent Invoices</h3>
+        <a href="{{ url_for('invoices.create') }}" class="px-4 py-2 bg-brand text-white text-sm font-medium rounded-lg hover:opacity-90">
+            New Invoice
+        </a>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead>
+                <tr class="text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <th class="px-6 py-3">Invoice</th>
+                    <th class="px-6 py-3">Customer</th>
+                    <th class="px-6 py-3">Amount</th>
+                    <th class="px-6 py-3">Method</th>
+                    <th class="px-6 py-3">Status</th>
+                    <th class="px-6 py-3">Date</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                {% for inv in recent_invoices %}
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                    <td class="px-6 py-4">
+                        <a href="{{ url_for('invoices.detail', ref=inv.invoice_number) }}" class="text-brand hover:underline font-medium">
+                            {{ inv.invoice_number }}
+                        </a>
+                    </td>
+                    <td class="px-6 py-4 text-sm">{{ inv.customer_name or inv.customer_email or '—' }}</td>
+                    <td class="px-6 py-4 text-sm font-medium">{{ inv.total|currency(inv.currency) }}</td>
+                    <td class="px-6 py-4 text-sm">{{ inv.payments[0].method|method_label if inv.payments else (inv.payment_methods_enabled|primary_method|method_label if inv.payment_methods_enabled else '—') }}</td>
+                    <td class="px-6 py-4">{{ inv.status|status_badge }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-500">{{ inv.created_at|time_ago }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                        No invoices yet. <a href="{{ url_for('invoices.create') }}" class="text-brand hover:underline">Create your first invoice</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+{% block title %}Receipt — BTPay{% endblock %}
+{% block head %}{% if org and org.custom_checkout_css %}<style>{{ org.custom_checkout_css }}</style>{% endif %}{% endblock %}
+{% macro receipt_body() %}
+<div class="max-w-lg mx-auto py-8">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
+        <!-- Header -->
+        <div class="p-6 border-b border-gray-200 dark:border-gray-700 text-center">
+            <div class="w-16 h-16 mx-auto mb-4 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                </svg>
+            </div>
+            <h2 class="text-xl font-bold">Payment Receipt</h2>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ invoice.invoice_number }}</p>
+        </div>
+
+        <!-- Details -->
+        <div class="p-6 space-y-4">
+            {% if invoice.customer_name or invoice.customer_email %}
+            <div>
+                <p class="text-xs text-gray-500 dark:text-gray-400 uppercase mb-1">Customer</p>
+                {% if invoice.customer_name %}<p class="font-medium">{{ invoice.customer_name }}</p>{% endif %}
+                {% if invoice.customer_email %}<p class="text-sm text-gray-600 dark:text-gray-400">{{ invoice.customer_email }}</p>{% endif %}
+            </div>
+            {% endif %}
+
+            <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
+                <table class="w-full text-sm">
+                    <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                        {% for line in lines %}
+                        <tr>
+                            <td class="py-2">{{ line.description }}</td>
+                            <td class="py-2 text-right text-gray-500">{{ line.quantity }} x {{ line.unit_price|currency(invoice.currency) }}</td>
+                            <td class="py-2 text-right font-medium pl-4">{{ line.amount|currency(invoice.currency) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="border-t border-gray-200 dark:border-gray-700 pt-4 space-y-1">
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-500">Subtotal</span>
+                    <span>{{ invoice.subtotal|currency(invoice.currency) }}</span>
+                </div>
+                {% if invoice.tax_amount and invoice.tax_amount > 0 %}
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-500">Tax ({{ invoice.tax_rate }}%)</span>
+                    <span>{{ invoice.tax_amount|currency(invoice.currency) }}</span>
+                </div>
+                {% endif %}
+                {% if invoice.discount_amount and invoice.discount_amount > 0 %}
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-500">Discount</span>
+                    <span class="text-red-600">-{{ invoice.discount_amount|currency(invoice.currency) }}</span>
+                </div>
+                {% endif %}
+                <div class="flex justify-between font-bold text-lg pt-2 border-t border-gray-200 dark:border-gray-700">
+                    <span>Total Paid</span>
+                    <span>{{ invoice.total|currency(invoice.currency) }}</span>
+                </div>
+            </div>
+
+            {% if invoice.btc_amount and invoice.btc_amount > 0 %}
+            <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-500">BTC Amount</span>
+                    <span class="font-mono">{{ invoice.btc_amount|btc }} BTC</span>
+                </div>
+                <div class="flex justify-between text-sm mt-1">
+                    <span class="text-gray-500">Exchange Rate</span>
+                    <span>1 BTC = {{ invoice.btc_rate|currency(invoice.currency) }}</span>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if payments %}
+            <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
+                <p class="text-xs text-gray-500 dark:text-gray-400 uppercase mb-2">Transactions</p>
+                {% for p in payments %}
+                <div class="p-2 bg-gray-50 dark:bg-gray-700 rounded text-xs font-mono mb-2">
+                    {% if p.txid %}
+                    <p class="break-all">{{ p.txid }}</p>
+                    {% endif %}
+                    <p class="text-gray-500 mt-1">{{ p.amount_btc|btc }} BTC &middot; {{ p.confirmations }} confirmations</p>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if org and org.receipt_footer %}
+            <div class="border-t border-gray-200 dark:border-gray-700 pt-4 text-center text-sm text-gray-600 dark:text-gray-400">
+                <p>{{ org.receipt_footer }}</p>
+            </div>
+            {% endif %}
+
+            {% if org and org.support_email %}
+            <div class="border-t border-gray-200 dark:border-gray-700 pt-4 text-center text-xs text-gray-400">
+                <p>Questions? Contact <a href="mailto:{{ org.support_email }}" class="text-blue-600 hover:underline">{{ org.support_email }}</a></p>
+            </div>
+            {% endif %}
+
+            <div class="border-t border-gray-200 dark:border-gray-700 pt-4 text-center text-xs text-gray-400">
+                <p>{{ invoice.paid_at|time_ago if invoice.paid_at else '' }}</p>
+            </div>
+        </div>
+    </div>
+
+    <p class="text-xs text-center text-gray-400 mt-4">Powered by BTPay</p>
+</div>
+{% endmacro %}
+{% block public_content %}{{ receipt_body() }}{% endblock %}
+{% block content %}{{ receipt_body() }}{% endblock %}

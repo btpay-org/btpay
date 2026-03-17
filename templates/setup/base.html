@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% block title %}Setup — BTPay{% endblock %}
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <div class="text-center mb-8">
+        <h2 class="text-2xl font-bold">Setup your BTPay instance</h2>
+        <p class="text-gray-500 dark:text-gray-400 mt-1">Get started in a few quick steps</p>
+    </div>
+
+    <!-- Step indicator -->
+    <div class="flex items-center justify-center mb-10 gap-0">
+        {% set steps = [
+            (1, 'Organization'),
+            (2, 'Payment'),
+            (3, 'Configure'),
+            (4, 'Done'),
+        ] %}
+        {% for num, label in steps %}
+        <div class="flex items-center">
+            <div class="flex flex-col items-center">
+                <div class="w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold
+                    {% if num < step %}bg-brand text-white
+                    {% elif num == step %}bg-brand text-white ring-4 ring-brand/20
+                    {% else %}bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400
+                    {% endif %}">
+                    {% if num < step %}
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                    {% else %}{{ num }}{% endif %}
+                </div>
+                <span class="text-xs mt-1.5 {% if num == step %}text-brand font-medium{% else %}text-gray-400 dark:text-gray-500{% endif %}">{{ label }}</span>
+            </div>
+            {% if not loop.last %}
+            <div class="w-12 sm:w-20 h-0.5 mx-1 mt-[-18px] {% if num < step %}bg-brand{% else %}bg-gray-200 dark:bg-gray-700{% endif %}"></div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Step content -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 sm:p-8">
+        {% block wizard_content %}{% endblock %}
+    </div>
+</div>
+{% endblock %}

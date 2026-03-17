@@ -1,0 +1,99 @@
+{% extends 'base.html' %}
+{% block title %}BTCPay Server — BTPay{% endblock %}
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <h2 class="text-2xl font-bold mb-6">Settings</h2>
+
+    <div class="flex flex-col lg:flex-row gap-6">
+        {% include 'settings/_nav.html' %}
+
+        <div class="flex-1">
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+                <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase mb-4">BTCPay Server</h3>
+                <p class="text-sm text-gray-500 mb-6">Connect to your self-hosted BTCPay Server instance. Supports both on-chain Bitcoin and Lightning payments.</p>
+
+                <form method="POST" class="space-y-4">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+
+                    <div class="flex items-center space-x-3 mb-4">
+                        <label class="text-sm font-medium">Enabled</label>
+                        <input type="hidden" name="is_active" value="0">
+                        <input type="checkbox" name="is_active" value="1"
+                               {% if conn and conn.is_active %}checked{% elif not conn %}checked{% endif %}
+                               class="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Display Name</label>
+                        <input type="text" name="name" value="{{ conn.name if conn else 'BTCPay Server' }}" placeholder="BTCPay Server"
+                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Server URL <span class="text-red-500">*</span></label>
+                        <input type="url" name="server_url" value="{{ conn.server_url if conn else '' }}" placeholder="https://btcpay.example.com"
+                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 font-mono text-sm">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium mb-1">API Key <span class="text-red-500">*</span></label>
+                        <input type="password" name="api_key" value="{{ conn.api_key if conn else '' }}" placeholder="Greenfield API key"
+                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 font-mono text-sm">
+                        <p class="text-xs text-gray-400 mt-1">Generate at BTCPay Server &rarr; Account &rarr; Manage Account &rarr; API Keys</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Store ID <span class="text-red-500">*</span></label>
+                        <input type="text" name="store_id" value="{{ conn.store_id if conn else '' }}" placeholder="Store ID from BTCPay"
+                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 font-mono text-sm">
+                        <p class="text-xs text-gray-400 mt-1">Found in BTCPay Server &rarr; Settings &rarr; General</p>
+                    </div>
+
+                    <div class="flex items-center gap-3">
+                        <button type="submit" class="px-6 py-2 bg-brand text-white rounded-lg hover:opacity-90 text-sm font-medium">
+                            Save BTCPay Settings
+                        </button>
+                        <button type="button" id="test-btn"
+                                class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-gray-700">
+                            Test Connection
+                        </button>
+                        <span id="test-result" class="text-sm"></span>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('test-btn').addEventListener('click', function() {
+    var result = document.getElementById('test-result');
+    result.textContent = 'Testing...';
+    result.className = 'text-sm text-gray-500';
+
+    fetch('{{ url_for("settings.test_btcpay") }}', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRF-Token': '{{ csrf_token }}'},
+        body: JSON.stringify({
+            server_url: document.querySelector('[name=server_url]').value,
+            api_key: document.querySelector('[name=api_key]').value,
+            store_id: document.querySelector('[name=store_id]').value,
+        })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success) {
+            result.textContent = 'Connected: ' + (data.store_name || 'OK');
+            result.className = 'text-sm text-green-600';
+        } else {
+            result.textContent = 'Failed: ' + (data.error || 'Unknown error');
+            result.className = 'text-sm text-red-600';
+        }
+    })
+    .catch(function(e) {
+        result.textContent = 'Error: ' + e.message;
+        result.className = 'text-sm text-red-600';
+    });
+});
+</script>
+{% endblock %}

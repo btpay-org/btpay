@@ -1,0 +1,136 @@
+{% extends 'base.html' %}
+{% block title %}Create Storefront — BTPay{% endblock %}
+{% block content %}
+<div class="mb-6">
+    <a href="{{ url_for('storefronts.list_storefronts') }}" class="text-sm text-gray-500 hover:text-brand">&larr; Back to Storefronts</a>
+    <h2 class="text-2xl font-bold mt-2">Create Storefront</h2>
+</div>
+
+<form method="POST" class="max-w-2xl space-y-6">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+
+    <!-- Type selection -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+        <h3 class="text-lg font-semibold mb-4">Storefront Type</h3>
+        <div class="grid grid-cols-2 gap-4">
+            <label class="cursor-pointer">
+                <input type="radio" name="storefront_type" value="store" checked class="peer hidden">
+                <div class="p-4 border-2 border-gray-200 dark:border-gray-600 rounded-xl peer-checked:border-brand peer-checked:bg-brand/5 transition">
+                    <svg class="w-8 h-8 text-brand mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
+                    <div class="font-medium">Store</div>
+                    <div class="text-sm text-gray-500 dark:text-gray-400">Sell products with fixed prices</div>
+                </div>
+            </label>
+            <label class="cursor-pointer">
+                <input type="radio" name="storefront_type" value="donation" class="peer hidden">
+                <div class="p-4 border-2 border-gray-200 dark:border-gray-600 rounded-xl peer-checked:border-brand peer-checked:bg-brand/5 transition">
+                    <svg class="w-8 h-8 text-brand mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
+                    <div class="font-medium">Donation / Tip Jar</div>
+                    <div class="text-sm text-gray-500 dark:text-gray-400">Collect donations with preset or custom amounts</div>
+                </div>
+            </label>
+        </div>
+    </div>
+
+    <!-- Basic info -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 space-y-4">
+        <h3 class="text-lg font-semibold">Details</h3>
+        <div>
+            <label class="block text-sm font-medium mb-1">Title <span class="text-red-500">*</span></label>
+            <input type="text" name="title" required placeholder="My Bitcoin Store"
+                   class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+        </div>
+        <div>
+            <label class="block text-sm font-medium mb-1">Description</label>
+            <textarea name="description" rows="3" placeholder="What are you selling or raising funds for?"
+                      class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700"></textarea>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium mb-1">Currency</label>
+                <select name="currency" class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+                    {% for c in ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'CHF', 'JPY', 'BTC'] %}
+                    <option value="{{ c }}" {% if c == (org.default_currency or 'USD') %}selected{% endif %}>{{ c }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-1">Button Text</label>
+                <input type="text" name="button_text" placeholder="Buy Now" value=""
+                       class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+            </div>
+        </div>
+        <div>
+            <label class="block text-sm font-medium mb-1">Hero Image URL</label>
+            <input type="url" name="hero_image_url" placeholder="https://..."
+                   class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+        </div>
+    </div>
+
+    <!-- Donation-specific settings (hidden by default, shown via JS) -->
+    <div id="donation-settings" class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 space-y-4 hidden">
+        <h3 class="text-lg font-semibold">Donation Settings</h3>
+        <div>
+            <label class="block text-sm font-medium mb-1">Preset Amounts (comma-separated)</label>
+            <input type="text" name="donation_presets" value="5, 10, 25, 50, 100" placeholder="5, 10, 25, 50, 100"
+                   class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+        </div>
+        <div class="flex items-center space-x-2">
+            <input type="checkbox" name="donation_allow_custom" value="1" checked id="allow_custom" class="rounded">
+            <label for="allow_custom" class="text-sm">Allow custom amounts</label>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium mb-1">Fundraising Goal</label>
+                <input type="number" name="donation_goal_amount" step="0.01" min="0" placeholder="0 = no goal"
+                       class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-1">Goal Label</label>
+                <input type="text" name="donation_goal_label" placeholder="e.g. Server costs"
+                       class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+            </div>
+        </div>
+    </div>
+
+    <!-- Checkout options -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 space-y-4">
+        <h3 class="text-lg font-semibold">Checkout Options</h3>
+        <div class="flex items-center space-x-4">
+            <label class="flex items-center space-x-2">
+                <input type="checkbox" name="require_email" value="1" class="rounded">
+                <span class="text-sm">Require email</span>
+            </label>
+            <label class="flex items-center space-x-2">
+                <input type="checkbox" name="require_name" value="1" class="rounded">
+                <span class="text-sm">Require name</span>
+            </label>
+        </div>
+        <div>
+            <label class="block text-sm font-medium mb-1">Success Message</label>
+            <input type="text" name="success_message" value="Thank you for your purchase!" placeholder="Thank you!"
+                   class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+        </div>
+        <div>
+            <label class="block text-sm font-medium mb-1">Redirect URL (optional)</label>
+            <input type="url" name="redirect_url" placeholder="https://yoursite.com/thanks"
+                   class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+        </div>
+    </div>
+
+    <button type="submit" class="px-6 py-2.5 bg-brand text-white font-medium rounded-lg hover:opacity-90">Create Storefront</button>
+</form>
+
+<script>
+(function() {
+    var radios = document.querySelectorAll('input[name="storefront_type"]');
+    var donationSection = document.getElementById('donation-settings');
+    function toggle() {
+        var val = document.querySelector('input[name="storefront_type"]:checked').value;
+        donationSection.classList.toggle('hidden', val !== 'donation');
+    }
+    radios.forEach(function(r) { r.addEventListener('change', toggle); });
+    toggle();
+})();
+</script>
+{% endblock %}

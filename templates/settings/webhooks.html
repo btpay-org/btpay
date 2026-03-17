@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+{% block title %}Webhooks — BTPay{% endblock %}
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <h2 class="text-2xl font-bold mb-6">Settings</h2>
+    <div class="flex flex-col lg:flex-row gap-6">
+        {% include 'settings/_nav.html' %}
+        <div class="flex-1 space-y-6">
+            <!-- Existing endpoints -->
+            {% if endpoints %}
+            {% for ep in endpoints %}
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="font-medium font-mono text-sm break-all">{{ ep.url }}</p>
+                        {% if ep.description %}
+                        <p class="text-sm text-gray-500 mt-1">{{ ep.description }}</p>
+                        {% endif %}
+                        <div class="mt-2 flex flex-wrap gap-1">
+                            {% for evt in (ep.events or []) %}
+                            <span class="px-2 py-0.5 text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded">{{ evt }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        {% if ep.is_active %}
+                        <span class="px-2 py-1 text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 rounded">Active</span>
+                        {% else %}
+                        <span class="px-2 py-1 text-xs bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 rounded">Inactive</span>
+                        {% endif %}
+                        <form method="POST" action="{{ url_for('settings.delete_webhook', endpoint_id=ep.id) }}" class="inline"
+                              onsubmit="return confirm('Delete this webhook?')">
+                            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                            <button type="submit" class="text-sm text-red-600 hover:text-red-800">Delete</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 text-center text-gray-500 text-sm">
+                No webhooks configured.
+            </div>
+            {% endif %}
+
+            <!-- Add webhook -->
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+                <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase mb-4">Add Webhook Endpoint</h3>
+                <form method="POST" class="space-y-4">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">URL</label>
+                        <input type="url" name="url" required placeholder="https://example.com/webhook"
+                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Secret (for HMAC-SHA256 signing)</label>
+                        <input type="text" name="secret" placeholder="Optional signing secret"
+                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 font-mono text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Description</label>
+                        <input type="text" name="description" placeholder="Optional description"
+                               class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700">
+                    </div>
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <label class="block text-sm font-medium">Events</label>
+                            <div class="flex space-x-2 text-xs">
+                                <button type="button" onclick="document.querySelectorAll('input[name=events]').forEach(c => c.checked = true)" class="text-brand hover:underline">Select all</button>
+                                <span class="text-gray-300 dark:text-gray-600">|</span>
+                                <button type="button" onclick="document.querySelectorAll('input[name=events]').forEach(c => c.checked = false)" class="text-brand hover:underline">None</button>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            {% for evt, desc in [
+                                ('invoice.created', 'When an invoice is finalized'),
+                                ('invoice.paid', 'When full payment is detected'),
+                                ('invoice.confirmed', 'When payment is confirmed on-chain'),
+                                ('invoice.expired', 'When an invoice expires'),
+                                ('payment.received', 'When any payment is received'),
+                                ('*', 'Subscribe to all current and future events'),
+                            ] %}
+                            <label class="flex items-start space-x-2 p-2 rounded border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer">
+                                <input type="checkbox" name="events" value="{{ evt }}"
+                                       class="mt-0.5 rounded border-gray-300 dark:border-gray-600">
+                                <div>
+                                    <span class="text-sm {% if evt == '*' %}font-medium{% endif %}">{{ evt if evt != '*' else 'All events (*)' }}</span>
+                                    <p class="text-xs text-gray-400 mt-0.5">{{ desc }}</p>
+                                </div>
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <button type="submit" class="px-6 py-2 bg-brand text-white rounded-lg hover:opacity-90 text-sm font-medium">
+                        Add Webhook
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
