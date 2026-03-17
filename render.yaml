@@ -4,7 +4,13 @@ services:
     runtime: python
     buildCommand: pip install -r requirements.lock
     startCommand: gunicorn -c deploy/gunicorn.conf.py wsgi:app
+    disk:
+      name: btpay-data
+      mountPath: /var/data/btpay
+      sizeGB: 1
     envVars:
+      - key: BTPAY_DATA_DIR
+        value: /var/data/btpay
       - key: BTPAY_DEMO
         value: "0"
       - key: BTPAY_SECRET_KEY

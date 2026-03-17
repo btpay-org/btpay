@@ -8,7 +8,7 @@ from btpay.dictobj import DictObj
 
 # ---- Paths ----
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(BASE_DIR, 'data')
+DATA_DIR = os.environ.get('BTPAY_DATA_DIR') or os.path.join(BASE_DIR, 'data')
 
 # ---- Environment ----
 import sys
