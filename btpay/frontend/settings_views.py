@@ -1106,22 +1106,20 @@ def backup():
     data_files = []
     total_size = 0
     if os.path.isdir(data_dir):
-        for fname in sorted(os.listdir(data_dir)):
-            if fname.endswith('.json'):
-                fpath = os.path.join(data_dir, fname)
-                size = os.path.getsize(fpath)
-                total_size += size
-                data_files.append({'name': fname, 'size': size})
+        db_path = os.path.join(data_dir, 'btpay.db')
+        if os.path.isfile(db_path):
+            size = os.path.getsize(db_path)
+            total_size += size
+            data_files.append({'name': 'btpay.db', 'size': size})
 
     # List existing automatic backups
     auto_backups = []
     if os.path.isdir(backup_dir):
-        for d in sorted(os.listdir(backup_dir), reverse=True):
-            dpath = os.path.join(backup_dir, d)
-            if os.path.isdir(dpath):
-                files = [f for f in os.listdir(dpath) if f.endswith('.json')]
-                bsize = sum(os.path.getsize(os.path.join(dpath, f)) for f in files)
-                auto_backups.append({'name': d, 'files': len(files), 'size': bsize})
+        for fname in sorted(os.listdir(backup_dir), reverse=True):
+            fpath = os.path.join(backup_dir, fname)
+            if os.path.isfile(fpath) and fname.endswith('.db'):
+                bsize = os.path.getsize(fpath)
+                auto_backups.append({'name': fname, 'files': 1, 'size': bsize})
 
     return render_template('settings/backup.html', org=g.org,
         data_files=data_files, total_size=total_size,
@@ -1132,7 +1130,7 @@ def backup():
 @login_required
 @role_required('admin')
 def backup_download():
-    '''Download a ZIP archive of all data files.'''
+    '''Download a ZIP archive of the pickle database.'''
     import io, zipfile, datetime, os
     from flask import send_file
     from btpay.orm.persistence import save_to_disk
@@ -1144,10 +1142,9 @@ def backup_download():
 
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
-        for fname in sorted(os.listdir(data_dir)):
-            if fname.endswith('.json'):
-                fpath = os.path.join(data_dir, fname)
-                zf.write(fpath, fname)
+        db_path = os.path.join(data_dir, 'btpay.db')
+        if os.path.isfile(db_path):
+            zf.write(db_path, 'btpay.db')
 
     buf.seek(0)
     timestamp = datetime.datetime.utcnow().strftime('%Y%m%d_%H%M%S')
@@ -1161,9 +1158,9 @@ def backup_download():
 @role_required('owner')
 def backup_restore():
     '''Restore data from an uploaded ZIP archive.'''
-    import io, zipfile, json, os
+    import io, zipfile, pickle, os
     from btpay.orm.persistence import (
-        save_to_disk, backup_rotation, load_from_disk, btpay_decoder,
+        save_to_disk, backup_rotation, load_from_disk,
     )
     from btpay.orm.engine import MemoryStore
 
@@ -1189,40 +1186,28 @@ def backup_restore():
         flash('Invalid ZIP file', 'error')
         return redirect(url_for('settings.backup'))
 
-    # Validate: must contain _meta.json and only .json files
+    # Validate: must contain btpay.db
     names = zf.namelist()
-    if '_meta.json' not in names:
-        flash('Invalid backup: missing _meta.json', 'error')
+    if 'btpay.db' not in names:
+        flash('Invalid backup: missing btpay.db', 'error')
         return redirect(url_for('settings.backup'))
 
     for name in names:
-        if not name.endswith('.json'):
-            flash('Invalid backup: contains non-JSON file "%s"' % name, 'error')
-            return redirect(url_for('settings.backup'))
         # Reject path traversal
         if '..' in name or name.startswith('/'):
             flash('Invalid backup: suspicious filename "%s"' % name, 'error')
             return redirect(url_for('settings.backup'))
 
-    # Validate _meta.json is parseable
+    # Validate btpay.db is a valid pickle
     try:
-        meta = json.loads(zf.read('_meta.json'))
-        if 'models' not in meta:
-            flash('Invalid backup: _meta.json missing models list', 'error')
+        db_bytes = zf.read('btpay.db')
+        snapshot = pickle.loads(db_bytes)
+        if not isinstance(snapshot, dict) or 'models' not in snapshot:
+            flash('Invalid backup: corrupt btpay.db', 'error')
             return redirect(url_for('settings.backup'))
-    except (json.JSONDecodeError, KeyError):
-        flash('Invalid backup: corrupt _meta.json', 'error')
+    except Exception:
+        flash('Invalid backup: corrupt btpay.db', 'error')
         return redirect(url_for('settings.backup'))
-
-    # Validate all model JSON files are parseable
-    for name in names:
-        if name == '_meta.json':
-            continue
-        try:
-            json.loads(zf.read(name))
-        except json.JSONDecodeError:
-            flash('Invalid backup: corrupt file "%s"' % name, 'error')
-            return redirect(url_for('settings.backup'))
 
     # All checks passed — create a safety backup before restoring
     data_dir = current_app.config.get('DATA_DIR', 'data')
@@ -1231,11 +1216,19 @@ def backup_restore():
     except Exception:
         log.exception("Pre-restore backup failed")
 
-    # Extract files to data directory
-    for name in names:
-        dest = os.path.join(data_dir, os.path.basename(name))
-        with open(dest, 'wb') as f:
-            f.write(zf.read(name))
+    # Write the pickle file atomically
+    db_dest = os.path.join(data_dir, 'btpay.db')
+    tmp_path = db_dest + '.tmp'
+    try:
+        with open(tmp_path, 'wb') as f:
+            f.write(db_bytes)
+        os.replace(tmp_path, db_dest)
+    except Exception:
+        log.exception("Failed to write restored backup")
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+        flash('Restore failed: could not write data file', 'error')
+        return redirect(url_for('settings.backup'))
 
     # Reload data into memory
     store = MemoryStore()

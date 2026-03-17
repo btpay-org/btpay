@@ -1,13 +1,13 @@
 #
 # Backup and restore for the update system.
 #
-# Code backups use tar.gz archives; data backups use the same JSON dump
-# pattern as btpay.orm.persistence.backup_rotation.
+# Code backups use tar.gz archives; data backups copy the pickle db file.
 #
 import datetime
 import json
 import logging
 import os
+import shutil
 import tarfile
 import tempfile
 
@@ -53,28 +53,24 @@ def create_code_backup(app_root, backup_dir, version):
 
 def create_data_backup(data_dir, version):
     '''
-    Create a JSON snapshot of all data files (same pattern as persistence.backup_rotation).
+    Copy the pickle database file as a backup.
 
     Returns the path to the backup file, or None on failure.
     '''
     backup_dir = os.path.join(data_dir, 'backups')
     os.makedirs(backup_dir, exist_ok=True)
     timestamp = datetime.datetime.utcnow().strftime('%Y%m%d_%H%M%S')
-    filename = 'data_%s_%s.json' % (version, timestamp)
+    filename = 'data_%s_%s.db' % (version, timestamp)
     dest = os.path.join(backup_dir, filename)
     tmp_path = dest + '.tmp'
 
-    try:
-        # Collect all model data into a single snapshot
-        snapshot = {}
-        for fname in os.listdir(data_dir):
-            if fname.endswith('.json'):
-                fpath = os.path.join(data_dir, fname)
-                with open(fpath, 'r') as f:
-                    snapshot[fname] = json.load(f)
+    src = os.path.join(data_dir, 'btpay.db')
+    if not os.path.exists(src):
+        log.warning('No btpay.db found to backup')
+        return None
 
-        with open(tmp_path, 'w') as f:
-            json.dump(snapshot, f, indent=2)
+    try:
+        shutil.copy2(src, tmp_path)
         os.replace(tmp_path, dest)
         log.info('Data backup created: %s', dest)
         return dest
@@ -113,7 +109,7 @@ def restore_code_backup(backup_path, app_root):
 
 def restore_data_backup(backup_path, data_dir):
     '''
-    Restore JSON data from a backup snapshot.
+    Restore pickle database from a backup.
 
     Returns (success, error_message).
     '''
@@ -121,15 +117,10 @@ def restore_data_backup(backup_path, data_dir):
         return (False, 'Backup file not found: %s' % backup_path)
 
     try:
-        with open(backup_path, 'r') as f:
-            snapshot = json.load(f)
-
-        for fname, content in snapshot.items():
-            fpath = os.path.join(data_dir, fname)
-            tmp_path = fpath + '.tmp'
-            with open(tmp_path, 'w') as f:
-                json.dump(content, f, indent=2)
-            os.replace(tmp_path, fpath)
+        dest = os.path.join(data_dir, 'btpay.db')
+        tmp_path = dest + '.tmp'
+        shutil.copy2(backup_path, tmp_path)
+        os.replace(tmp_path, dest)
 
         log.info('Data restored from %s', backup_path)
         return (True, '')

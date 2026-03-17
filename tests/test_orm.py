@@ -2,7 +2,7 @@
 # Tests for the in-memory ORM
 #
 import pytest
-import os, json, tempfile
+import os, json, pickle, tempfile
 from btpay.orm.model import MemModel, BaseMixin
 from btpay.orm.columns import Text, Integer, Boolean, DecimalColumn, DateTimeColumn, TagsColumn, JsonColumn
 from btpay.orm.engine import MemoryStore
@@ -228,7 +228,8 @@ class TestSerialization:
 # ---- Persistence Tests ----
 
 class TestPersistence:
-    def test_save_and_load(self):
+    def test_save_and_load_pickle(self):
+        '''Test save/load with the new pickle format.'''
         from btpay.orm.persistence import save_to_disk, load_from_disk
 
         u = TestUser(email='persist@test.com', name='Persist', age=99)
@@ -239,14 +240,16 @@ class TestPersistence:
         with tempfile.TemporaryDirectory() as tmpdir:
             save_to_disk(tmpdir)
 
+            # Verify pickle file exists
+            assert os.path.exists(os.path.join(tmpdir, 'btpay.db'))
+
             # Clear store
             store = MemoryStore()
             store.clear()
 
             assert TestUser.get(u.id) is None
 
-            # Re-register models (normally done by metaclass)
-            from btpay.orm.columns import Text as _T
+            # Re-register models
             store.register_model('TestUser', TestUser._columns)
             store.register_model('TestProduct', TestProduct._columns)
 
@@ -260,6 +263,208 @@ class TestPersistence:
             loaded_p = TestProduct.get(p.id)
             assert loaded_p.title == 'Widget'
             assert loaded_p.price == Decimal('9.99')
+
+    def test_pickle_file_is_valid(self):
+        '''Verify the pickle file is a valid pickle.'''
+        from btpay.orm.persistence import save_to_disk
+
+        TestUser(email='pickle@test.com', name='Pickle').save()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            save_to_disk(tmpdir)
+            fpath = os.path.join(tmpdir, 'btpay.db')
+            with open(fpath, 'rb') as f:
+                data = pickle.load(f)
+            assert data['schema_version'] == 2
+            assert 'TestUser' in data['models']
+
+    def test_backup_rotation(self):
+        '''Test backup creates .db files and rotates.'''
+        from btpay.orm.persistence import save_to_disk, backup_rotation
+
+        TestUser(email='bk@test.com', name='Backup').save()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            save_to_disk(tmpdir)
+
+            # Create multiple backups
+            for _ in range(3):
+                backup_rotation(tmpdir, keep=10)
+
+            backup_dir = os.path.join(tmpdir, 'backups')
+            backups = [f for f in os.listdir(backup_dir) if f.endswith('.db')]
+            assert len(backups) >= 1
+
+    def test_backup_rotation_keeps_limit(self):
+        '''Test that backup rotation respects keep limit.'''
+        from btpay.orm.persistence import save_to_disk, backup_rotation
+        import time
+
+        TestUser(email='bklim@test.com', name='Limit').save()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            save_to_disk(tmpdir)
+
+            # Create more backups than the keep limit
+            backup_dir = os.path.join(tmpdir, 'backups')
+            os.makedirs(backup_dir, exist_ok=True)
+
+            # Create 12 fake backup files
+            for i in range(12):
+                ts = '20260101_%06d' % i
+                fpath = os.path.join(backup_dir, 'backup_%s.db' % ts)
+                with open(fpath, 'wb') as f:
+                    f.write(b'test')
+
+            # Run rotation with keep=10
+            backup_rotation(tmpdir, keep=10)
+
+            backups = [f for f in os.listdir(backup_dir) if f.endswith('.db')]
+            # 12 existing + 1 new = 13, but should keep 10 old + 1 new = 11 max
+            assert len(backups) <= 11
+
+    def test_write_after_change(self):
+        '''Test that data is written to disk after every save.'''
+        from btpay.orm.persistence import init_persistence
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            store = MemoryStore()
+            init_persistence(tmpdir)
+
+            TestUser(email='immediate@test.com', name='Immediate').save()
+
+            # The pickle file should exist immediately
+            fpath = os.path.join(tmpdir, 'btpay.db')
+            assert os.path.exists(fpath)
+
+            # Load it and verify
+            with open(fpath, 'rb') as f:
+                data = pickle.load(f)
+            assert 'TestUser' in data['models']
+
+            # Clean up hook
+            store.set_after_write_hook(None)
+
+    def test_write_after_delete(self):
+        '''Test that deletes also trigger persistence.'''
+        from btpay.orm.persistence import init_persistence
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            store = MemoryStore()
+            init_persistence(tmpdir)
+
+            u = TestUser(email='del@test.com', name='Delete')
+            u.save()
+            pk = u.id
+
+            # Verify it was written
+            fpath = os.path.join(tmpdir, 'btpay.db')
+            with open(fpath, 'rb') as f:
+                data = pickle.load(f)
+            rows = data['models']['TestUser']['rows']
+            assert str(pk) in rows
+
+            # Delete and verify
+            u.delete()
+            with open(fpath, 'rb') as f:
+                data = pickle.load(f)
+            rows = data['models']['TestUser']['rows']
+            assert str(pk) not in rows
+
+            # Clean up hook
+            store.set_after_write_hook(None)
+
+
+# ---- JSON Migration Tests ----
+
+class TestJSONMigration:
+    def test_migrate_from_json(self):
+        '''Test migration from legacy JSON format to pickle.'''
+        from btpay.orm.persistence import load_from_disk
+        import datetime
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create legacy JSON files
+            meta = {
+                'schema_version': 1,
+                'saved_at': datetime.datetime.utcnow().isoformat(),
+                'models': ['TestUser'],
+            }
+            with open(os.path.join(tmpdir, '_meta.json'), 'w') as f:
+                json.dump(meta, f)
+
+            user_data = {
+                'sequence': 3,
+                'rows': {
+                    '1': {
+                        'email': 'legacy@test.com',
+                        'name': 'Legacy',
+                        'age': 50,
+                        'is_active': True,
+                        'balance': {'__decimal__': '100.50'},
+                        'tags': {'__set__': ['admin']},
+                        'meta': None,
+                        'created_at': None,
+                        'updated_at': None,
+                    },
+                    '2': {
+                        'email': 'legacy2@test.com',
+                        'name': 'Legacy2',
+                        'age': 25,
+                        'is_active': False,
+                        'balance': {'__decimal__': '0'},
+                        'tags': {'__set__': []},
+                        'meta': {'key': 'val'},
+                        'created_at': None,
+                        'updated_at': None,
+                    },
+                }
+            }
+            with open(os.path.join(tmpdir, 'TestUser.json'), 'w') as f:
+                json.dump(user_data, f)
+
+            # Clear store and re-register
+            store = MemoryStore()
+            store.clear()
+            store.register_model('TestUser', TestUser._columns)
+
+            # Load (should trigger migration)
+            load_from_disk(tmpdir)
+
+            # Verify data was loaded
+            u = TestUser.get(1)
+            assert u is not None
+            assert u.email == 'legacy@test.com'
+            assert u.name == 'Legacy'
+            assert u.age == 50
+            assert u.balance == Decimal('100.50')
+            assert u.tags == {'admin'}
+
+            u2 = TestUser.get(2)
+            assert u2.email == 'legacy2@test.com'
+            assert u2.is_active is False
+
+            # Verify pickle file was created
+            assert os.path.exists(os.path.join(tmpdir, 'btpay.db'))
+
+            # Verify legacy JSON was moved
+            assert not os.path.exists(os.path.join(tmpdir, '_meta.json'))
+            assert not os.path.exists(os.path.join(tmpdir, 'TestUser.json'))
+            assert os.path.exists(os.path.join(tmpdir, 'legacy_json', '_meta.json'))
+            assert os.path.exists(os.path.join(tmpdir, 'legacy_json', 'TestUser.json'))
+
+    def test_no_data_starts_fresh(self):
+        '''Test that a missing data dir starts fresh without errors.'''
+        from btpay.orm.persistence import load_from_disk
+        load_from_disk('/nonexistent/path')
+        # Should not raise
+
+    def test_empty_data_dir_starts_fresh(self):
+        '''Test that an empty data dir starts fresh.'''
+        from btpay.orm.persistence import load_from_disk
+        with tempfile.TemporaryDirectory() as tmpdir:
+            load_from_disk(tmpdir)
+            # Should not raise
 
 
 # ---- Column Type Tests ----

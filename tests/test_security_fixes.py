@@ -100,6 +100,10 @@ class TestRefnumConfigKeys:
     def test_app_startup_configures_refnums(self):
         '''App startup calls reconfigure() with config keys — using non-default
         keys proves that create_app() actually applied them.'''
+        import shutil
+        if os.path.exists('/tmp/btpay_test_refnum'):
+            shutil.rmtree('/tmp/btpay_test_refnum')
+
         from app import create_app
         from btpay.security.refnums import ReferenceNumbers
 

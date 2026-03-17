@@ -22,6 +22,7 @@ def app():
 
     from app import create_app
     app = create_app({'TESTING': True, 'SECRET_KEY': 'test-secret-key',
+                      'DATA_DIR': '/tmp/btpay_test',
                       'AUTH_COOKIE_NAME': 'btpay_session',
                       'JWT_SECRETS': {'admin': 'a' * 32, 'login': 'l' * 32,
                                       'api': 'p' * 32, 'invite': 'i' * 32}})

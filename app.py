@@ -135,8 +135,9 @@ def _init_orm(app):
 
     # Skip loading persisted data in demo mode (seed will populate)
     if not app.config.get('DEMO_MODE'):
-        from btpay.orm.persistence import load_from_disk
+        from btpay.orm.persistence import load_from_disk, init_persistence
         load_from_disk(data_dir)
+        init_persistence(data_dir)
 
 
 def _init_demo(app):
