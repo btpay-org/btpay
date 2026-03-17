@@ -1290,8 +1290,6 @@ def updates_check():
     except Exception as e:
         log.exception('Failed to check for updates')
         msg = str(e)
-        if 'circular import' in msg or 'partially initialized' in msg:
-            msg = 'requests library failed to load — try again in a few seconds'
         return render_template_string(
             '<div class="text-red-400 text-sm mt-2">Failed to check for updates: {{ error }}</div>',
             error=msg
