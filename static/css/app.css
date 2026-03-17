@@ -1,0 +1,38 @@
+/*
+ * PyBills — app.css
+ *
+ * In development, Tailwind CSS is loaded via CDN (see base.html).
+ * For production, compile Tailwind into this file:
+ *
+ *   npx tailwindcss -i static/css/input.css -o static/css/app.css --minify
+ *
+ * Then remove the CDN script tag from base.html and add:
+ *   <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+ */
+
+/* Custom utilities not covered by Tailwind */
+
+/* Pulse animation for payment waiting indicator */
+@keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
+.animate-pulse-dot {
+    animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+/* Settings nav collapsible categories */
+details.settings-category[open] > summary .cat-chevron {
+    transform: rotate(90deg);
+}
+details.settings-category > summary::-webkit-details-marker {
+    display: none;
+}
+
+/* Print styles for receipts */
+@media print {
+    .no-print { display: none !important; }
+    body { background: white !important; }
+    .shadow-sm { box-shadow: none !important; }
+}
