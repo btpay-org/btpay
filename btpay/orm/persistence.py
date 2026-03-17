@@ -5,8 +5,7 @@
 # Writes immediately after every data change via the engine hook.
 # Keeps 10 timestamped backups.
 #
-import os, pickle, json, threading, signal, logging, datetime, time, glob
-from decimal import Decimal
+import os, pickle, threading, signal, logging, datetime, time, glob
 from btpay.orm.engine import MemoryStore
 
 log = logging.getLogger(__name__)
@@ -74,13 +73,9 @@ def load_from_disk(data_dir):
         return
 
     pickle_path = os.path.join(data_dir, 'btpay.db')
-    meta_path = os.path.join(data_dir, '_meta.json')
 
     if os.path.exists(pickle_path):
         _load_pickle(data_dir, pickle_path)
-    elif os.path.exists(meta_path):
-        log.info("Found legacy JSON data, migrating to pickle...")
-        _migrate_from_json(data_dir)
     else:
         log.info("No data in %s, starting fresh" % data_dir)
 
@@ -113,67 +108,6 @@ def _load_pickle(data_dir, pickle_path):
         log.info("Loaded %d %s records" % (len(rows), model_name))
 
     log.info("Data loaded from %s" % pickle_path)
-
-
-def _migrate_from_json(data_dir):
-    '''Migrate legacy JSON files to pickle format.'''
-    # Use the legacy JSON loader
-    from btpay.orm.model import get_model_registry
-    registry = get_model_registry()
-    store = MemoryStore()
-
-    meta_path = os.path.join(data_dir, '_meta.json')
-    with open(meta_path, 'r') as f:
-        meta = json.load(f)
-
-    for model_name in meta.get('models', []):
-        if model_name not in registry:
-            log.warning("Model '%s' in data but not registered, skipping" % model_name)
-            continue
-
-        fpath = os.path.join(data_dir, '%s.json' % model_name)
-        if not os.path.exists(fpath):
-            continue
-
-        try:
-            with open(fpath, 'r') as f:
-                payload = json.load(f, object_hook=_legacy_json_decoder)
-
-            model_cls = registry[model_name]
-            store.load_table_data(model_name, payload.get('rows', {}), model_cls)
-
-            seq = payload.get('sequence', 1)
-            store.set_sequence(model_name, seq)
-
-            count = len(payload.get('rows', {}))
-            log.info("Migrated %d %s records from JSON" % (count, model_name))
-        except Exception:
-            log.exception("Failed to migrate %s" % model_name)
-
-    # Write the new pickle file
-    save_to_disk(data_dir)
-
-    # Move legacy JSON files to a backup subdirectory
-    legacy_dir = os.path.join(data_dir, 'legacy_json')
-    os.makedirs(legacy_dir, exist_ok=True)
-    for fname in os.listdir(data_dir):
-        if fname.endswith('.json') and os.path.isfile(os.path.join(data_dir, fname)):
-            src = os.path.join(data_dir, fname)
-            dst = os.path.join(legacy_dir, fname)
-            os.replace(src, dst)
-
-    log.info("Migration complete. Legacy JSON moved to %s" % legacy_dir)
-
-
-def _legacy_json_decoder(obj):
-    '''Decode legacy JSON with custom type markers.'''
-    if '__decimal__' in obj:
-        return Decimal(obj['__decimal__'])
-    if '__datetime__' in obj:
-        return datetime.datetime.fromisoformat(obj['__datetime__'])
-    if '__set__' in obj:
-        return set(obj['__set__'])
-    return obj
 
 
 def backup_rotation(data_dir, keep=10):
