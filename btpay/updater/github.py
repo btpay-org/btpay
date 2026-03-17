@@ -37,7 +37,11 @@ class GitHubReleaseFetcher:
         if cached is not None:
             return cached
 
-        import requests as req_lib
+        try:
+            import requests as req_lib
+        except (ImportError, AttributeError):
+            log.warning('requests library not available')
+            return []
 
         session = self._get_session(req_lib)
         url = 'https://api.github.com/repos/%s/tags' % self.repo
@@ -73,7 +77,11 @@ class GitHubReleaseFetcher:
         if cached is not None:
             return cached
 
-        import requests as req_lib
+        try:
+            import requests as req_lib
+        except (ImportError, AttributeError):
+            log.warning('requests library not available')
+            return []
 
         session = self._get_session(req_lib)
         url = 'https://api.github.com/repos/%s/releases' % self.repo
