@@ -1,10 +1,12 @@
 #
 # GitHub release fetcher — queries tags and releases via the GitHub API.
 #
-# Uses the same SOCKS5 proxy pattern as btpay.bitcoin.exchange.
+# Uses requests if available, falls back to stdlib urllib.
 #
+import json
 import logging
 import time
+import urllib.request
 
 from btpay.updater.version_compare import sort_versions
 
@@ -13,12 +15,22 @@ log = logging.getLogger(__name__)
 _CACHE_TTL = 300  # 5 minutes
 
 
+def _fetch_json(url, timeout=15):
+    '''Fetch JSON from a URL using stdlib urllib (no external deps).'''
+    req = urllib.request.Request(url, headers={
+        'User-Agent': 'BTPay/1.0',
+        'Accept': 'application/vnd.github.v3+json',
+    })
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return json.loads(resp.read())
+
+
 class GitHubReleaseFetcher:
     '''
     Fetches tags and releases from a GitHub repository.
 
     Usage:
-        fetcher = GitHubReleaseFetcher(repo='btpay-org/btpay', proxy='socks5h://...')
+        fetcher = GitHubReleaseFetcher(repo='btpay-org/btpay')
         tags = fetcher.fetch_tags()
         releases = fetcher.fetch_releases()
     '''
@@ -37,19 +49,10 @@ class GitHubReleaseFetcher:
         if cached is not None:
             return cached
 
-        try:
-            import requests as req_lib
-        except (ImportError, AttributeError):
-            log.warning('requests library not available')
-            return []
-
-        session = self._get_session(req_lib)
         url = 'https://api.github.com/repos/%s/tags' % self.repo
 
         try:
-            resp = session.get(url, timeout=15)
-            resp.raise_for_status()
-            data = resp.json()
+            data = _fetch_json(url)
         except Exception:
             log.exception('Failed to fetch tags from %s', url)
             return []
@@ -77,19 +80,10 @@ class GitHubReleaseFetcher:
         if cached is not None:
             return cached
 
-        try:
-            import requests as req_lib
-        except (ImportError, AttributeError):
-            log.warning('requests library not available')
-            return []
-
-        session = self._get_session(req_lib)
         url = 'https://api.github.com/repos/%s/releases' % self.repo
 
         try:
-            resp = session.get(url, timeout=15)
-            resp.raise_for_status()
-            data = resp.json()
+            data = _fetch_json(url)
         except Exception:
             log.exception('Failed to fetch releases from %s', url)
             return []
@@ -106,18 +100,6 @@ class GitHubReleaseFetcher:
 
         self._set_cached('releases', releases)
         return releases
-
-    def _get_session(self, req_lib):
-        '''Create a requests session with optional SOCKS5 proxy.'''
-        session = req_lib.Session()
-        session.headers['User-Agent'] = 'BTPay/1.0'
-        session.headers['Accept'] = 'application/vnd.github.v3+json'
-        if self.proxy:
-            session.proxies = {
-                'http': self.proxy,
-                'https': self.proxy,
-            }
-        return session
 
     def _get_cached(self, key):
         '''Return cached data if still valid, else None.'''
