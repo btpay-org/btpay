@@ -24,6 +24,19 @@ class MemoryStore:
         self._indexes = {}
         self._schemas = {}
         self._lock = threading.RLock()
+        self._after_write_hook = None
+
+    def set_after_write_hook(self, hook):
+        '''Set a callback to be called after every insert/update/delete.'''
+        self._after_write_hook = hook
+
+    def _notify_write(self):
+        '''Call the after-write hook if set.'''
+        if self._after_write_hook:
+            try:
+                self._after_write_hook()
+            except Exception:
+                pass  # persistence errors must not break data operations
 
     def register_model(self, model_name, columns):
         '''Called by MemModelMeta to register a new model class.'''
@@ -50,18 +63,21 @@ class MemoryStore:
         with self._lock:
             self._tables[model_name][pk] = data.copy()
             self._update_indexes(model_name, pk, None, data)
+        self._notify_write()
 
     def update(self, model_name, pk, data):
         with self._lock:
             old_data = self._tables[model_name].get(pk)
             self._tables[model_name][pk] = data.copy()
             self._update_indexes(model_name, pk, old_data, data)
+        self._notify_write()
 
     def delete(self, model_name, pk):
         with self._lock:
             old_data = self._tables[model_name].pop(pk, None)
             if old_data:
                 self._remove_indexes(model_name, pk, old_data)
+        self._notify_write()
 
     def get(self, model_name, pk):
         with self._lock:

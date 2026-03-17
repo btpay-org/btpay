@@ -21,7 +21,10 @@ def clean_store():
 
     store = MemoryStore()
     store.clear()
+    # Disable write-after-change hook during tests (individual tests opt in)
+    store.set_after_write_hook(None)
     yield store
+    store.set_after_write_hook(None)
     store.clear()
 
     # Clean up after test too

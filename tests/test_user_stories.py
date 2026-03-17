@@ -4612,7 +4612,7 @@ class TestStory_BackupRestore:
         assert b'DOWNLOAD BACKUP' in resp.data or b'Download Backup' in resp.data
 
     def test_backup_page_shows_data_files(self, app):
-        '''Backup page lists the JSON data files.'''
+        '''Backup page lists the pickle data file.'''
         client, user, org, token = _auth_setup(app)
         # Force save so files exist
         from btpay.orm.persistence import save_to_disk
@@ -4620,7 +4620,7 @@ class TestStory_BackupRestore:
             save_to_disk(app.config['DATA_DIR'])
         resp = client.get('/settings/backup')
         assert resp.status_code == 200
-        assert b'.json' in resp.data
+        assert b'btpay.db' in resp.data
 
     def test_backup_download_returns_zip(self, app):
         '''Download endpoint returns a ZIP file.'''
@@ -4631,24 +4631,24 @@ class TestStory_BackupRestore:
         assert b'attachment' in resp.headers.get('Content-Disposition', '').encode()
         assert b'btpay_backup_' in resp.headers.get('Content-Disposition', '').encode()
 
-    def test_backup_zip_contains_meta(self, app):
-        '''Downloaded ZIP contains _meta.json.'''
+    def test_backup_zip_contains_db(self, app):
+        '''Downloaded ZIP contains btpay.db.'''
         import io, zipfile
         client, user, org, token = _auth_setup(app)
         resp = client.get('/settings/backup/download')
         zf = zipfile.ZipFile(io.BytesIO(resp.data))
-        assert '_meta.json' in zf.namelist()
+        assert 'btpay.db' in zf.namelist()
 
-    def test_backup_zip_contains_model_files(self, app):
-        '''Downloaded ZIP contains model data files.'''
-        import io, zipfile
+    def test_backup_zip_db_is_valid_pickle(self, app):
+        '''Downloaded btpay.db is a valid pickle snapshot.'''
+        import io, zipfile, pickle
         client, user, org, token = _auth_setup(app)
         resp = client.get('/settings/backup/download')
         zf = zipfile.ZipFile(io.BytesIO(resp.data))
-        names = zf.namelist()
-        assert 'User.json' in names
-        assert 'Organization.json' in names
-        assert 'Invoice.json' in names
+        snapshot = pickle.loads(zf.read('btpay.db'))
+        assert 'models' in snapshot
+        assert 'User' in snapshot['models']
+        assert 'Organization' in snapshot['models']
 
     def test_backup_restore_requires_owner(self, app):
         '''Restore endpoint requires owner role, not just admin.'''
@@ -4702,15 +4702,15 @@ class TestStory_BackupRestore:
         assert resp.status_code == 200
         assert b'Invalid ZIP' in resp.data or b'error' in resp.data.lower()
 
-    def test_backup_restore_rejects_missing_meta(self, app):
-        '''Restore rejects ZIP without _meta.json.'''
+    def test_backup_restore_rejects_missing_db(self, app):
+        '''Restore rejects ZIP without btpay.db.'''
         import io, zipfile
         client, user, org, token = _auth_setup(app)
         csrf = _csrf_token(token, app)
 
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, 'w') as zf:
-            zf.writestr('User.json', '{}')
+            zf.writestr('random.txt', 'hello')
         buf.seek(0)
 
         data = {
@@ -4721,18 +4721,17 @@ class TestStory_BackupRestore:
                           content_type='multipart/form-data',
                           follow_redirects=True)
         assert resp.status_code == 200
-        assert b'missing _meta.json' in resp.data
+        assert b'missing btpay.db' in resp.data
 
-    def test_backup_restore_rejects_non_json_files(self, app):
-        '''Restore rejects ZIP with non-JSON files.'''
-        import io, zipfile, json
+    def test_backup_restore_rejects_corrupt_db(self, app):
+        '''Restore rejects ZIP with corrupt btpay.db.'''
+        import io, zipfile
         client, user, org, token = _auth_setup(app)
         csrf = _csrf_token(token, app)
 
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, 'w') as zf:
-            zf.writestr('_meta.json', json.dumps({'models': []}))
-            zf.writestr('malicious.sh', 'rm -rf /')
+            zf.writestr('btpay.db', b'not a pickle')
         buf.seek(0)
 
         data = {
@@ -4743,18 +4742,19 @@ class TestStory_BackupRestore:
                           content_type='multipart/form-data',
                           follow_redirects=True)
         assert resp.status_code == 200
-        assert b'non-JSON' in resp.data
+        assert b'corrupt' in resp.data.lower()
 
     def test_backup_restore_rejects_path_traversal(self, app):
         '''Restore rejects ZIP with path traversal filenames.'''
-        import io, zipfile, json
+        import io, zipfile, pickle
         client, user, org, token = _auth_setup(app)
         csrf = _csrf_token(token, app)
 
+        snapshot = {'schema_version': 2, 'models': {}}
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, 'w') as zf:
-            zf.writestr('_meta.json', json.dumps({'models': []}))
-            zf.writestr('../../../etc/passwd.json', '{}')
+            zf.writestr('btpay.db', pickle.dumps(snapshot))
+            zf.writestr('../../../etc/passwd', 'hacked')
         buf.seek(0)
 
         data = {
@@ -4768,8 +4768,8 @@ class TestStory_BackupRestore:
         assert b'suspicious' in resp.data
 
     def test_backup_roundtrip(self, app):
-        '''Download a backup, clear store, restore it, data is intact.'''
-        import io, zipfile
+        '''Download a backup, verify it contains valid pickle data.'''
+        import io, zipfile, pickle
         client, user, org, token = _auth_setup(app)
         _create_wallet(org)
         inv = _create_draft_invoice(org, user)
@@ -4780,10 +4780,13 @@ class TestStory_BackupRestore:
         assert resp.status_code == 200
         backup_data = resp.data
 
-        # Verify it's a valid ZIP with our data
+        # Verify it's a valid ZIP with pickle data
         zf = zipfile.ZipFile(io.BytesIO(backup_data))
-        assert 'Invoice.json' in zf.namelist()
-        assert 'User.json' in zf.namelist()
+        assert 'btpay.db' in zf.namelist()
+        snapshot = pickle.loads(zf.read('btpay.db'))
+        assert 'models' in snapshot
+        assert 'Invoice' in snapshot['models']
+        assert 'User' in snapshot['models']
 
     def test_backup_nav_entry(self, app):
         '''Settings nav includes Backup & Restore link.'''

@@ -1,147 +1,133 @@
 #
-# JSON file persistence layer.
+# Pickle-based persistence layer.
 #
-# Saves/loads the entire MemoryStore to/from JSON files.
-# Auto-save every N seconds + graceful shutdown save.
+# Saves/loads the entire MemoryStore to/from a single pickle file.
+# Writes immediately after every data change via the engine hook.
+# Keeps 10 timestamped backups.
 #
-import os, json, threading, signal, logging, datetime, time
-from decimal import Decimal
+import os, pickle, threading, signal, logging, datetime, time, glob
 from btpay.orm.engine import MemoryStore
 
 log = logging.getLogger(__name__)
 
-
-class BTPayEncoder(json.JSONEncoder):
-    '''Custom JSON encoder for Decimal, datetime, set.'''
-    def default(self, obj):
-        if isinstance(obj, Decimal):
-            return {'__decimal__': str(obj)}
-        if isinstance(obj, datetime.datetime):
-            return {'__datetime__': obj.isoformat()}
-        if isinstance(obj, set):
-            return {'__set__': sorted(list(obj))}
-        return super().default(obj)
+# Module-level data dir, set by init_persistence()
+_data_dir = None
+_write_lock = threading.Lock()
 
 
-def btpay_decoder(obj):
-    '''Custom JSON decoder hook.'''
-    if '__decimal__' in obj:
-        return Decimal(obj['__decimal__'])
-    if '__datetime__' in obj:
-        return datetime.datetime.fromisoformat(obj['__datetime__'])
-    if '__set__' in obj:
-        return set(obj['__set__'])
-    return obj
+def init_persistence(data_dir):
+    '''Initialize persistence: set the data dir and hook into engine writes.'''
+    global _data_dir
+    _data_dir = data_dir
+    os.makedirs(data_dir, exist_ok=True)
+
+    # Hook into the engine so every mutation triggers a write
+    store = MemoryStore()
+    store.set_after_write_hook(_after_write_hook)
+
+
+def _after_write_hook():
+    '''Called by MemoryStore after every insert/update/delete.'''
+    if _data_dir:
+        save_to_disk(_data_dir)
 
 
 def save_to_disk(data_dir):
-    '''Save all model data to JSON files in data_dir.'''
+    '''Save all model data to a single pickle file in data_dir.'''
     store = MemoryStore()
     os.makedirs(data_dir, exist_ok=True)
 
     models = store.registered_models()
-    meta = {
-        'schema_version': 1,
+    snapshot = {
+        'schema_version': 2,
         'saved_at': datetime.datetime.utcnow().isoformat(),
-        'models': models,
+        'models': {},
     }
 
     for model_name in models:
         table_data = store.get_table_data(model_name)
         seq = store.get_sequence(model_name)
-
-        payload = {
+        snapshot['models'][model_name] = {
             'sequence': seq,
             'rows': table_data,
         }
 
-        fpath = os.path.join(data_dir, '%s.json' % model_name)
-        tmp_path = fpath + '.tmp'
+    fpath = os.path.join(data_dir, 'btpay.db')
+    tmp_path = fpath + '.tmp'
 
+    with _write_lock:
         try:
-            with open(tmp_path, 'w') as f:
-                json.dump(payload, f, cls=BTPayEncoder, indent=2)
+            with open(tmp_path, 'wb') as f:
+                pickle.dump(snapshot, f, protocol=pickle.HIGHEST_PROTOCOL)
             os.replace(tmp_path, fpath)
         except Exception:
-            log.exception("Failed to save %s" % model_name)
+            log.exception("Failed to save data")
             if os.path.exists(tmp_path):
                 os.unlink(tmp_path)
 
-    # Save meta
-    meta_path = os.path.join(data_dir, '_meta.json')
-    with open(meta_path, 'w') as f:
-        json.dump(meta, f, indent=2)
-
-    log.info("Saved %d models to %s" % (len(models), data_dir))
-
 
 def load_from_disk(data_dir):
-    '''Load all JSON files from data_dir into MemoryStore.'''
+    '''Load data from pickle (or migrate from legacy JSON).'''
     if not os.path.isdir(data_dir):
         log.info("No data directory at %s, starting fresh" % data_dir)
         return
 
+    pickle_path = os.path.join(data_dir, 'btpay.db')
+
+    if os.path.exists(pickle_path):
+        _load_pickle(data_dir, pickle_path)
+    else:
+        log.info("No data in %s, starting fresh" % data_dir)
+
+
+def _load_pickle(data_dir, pickle_path):
+    '''Load from pickle file.'''
     from btpay.orm.model import get_model_registry
     registry = get_model_registry()
-
-    meta_path = os.path.join(data_dir, '_meta.json')
-    if not os.path.exists(meta_path):
-        log.info("No _meta.json in %s, starting fresh" % data_dir)
-        return
-
-    with open(meta_path, 'r') as f:
-        meta = json.load(f)
-
     store = MemoryStore()
 
-    for model_name in meta.get('models', []):
+    try:
+        with open(pickle_path, 'rb') as f:
+            snapshot = pickle.load(f)
+    except Exception:
+        log.exception("Failed to load %s" % pickle_path)
+        return
+
+    for model_name, payload in snapshot.get('models', {}).items():
         if model_name not in registry:
-            log.warning("Model '%s' found in data but not registered, skipping" % model_name)
+            log.warning("Model '%s' in data but not registered, skipping" % model_name)
             continue
 
-        fpath = os.path.join(data_dir, '%s.json' % model_name)
-        if not os.path.exists(fpath):
-            continue
+        model_cls = registry[model_name]
+        rows = payload.get('rows', {})
+        store.load_table_data(model_name, rows, model_cls)
 
-        try:
-            with open(fpath, 'r') as f:
-                payload = json.load(f, object_hook=btpay_decoder)
+        seq = payload.get('sequence', 1)
+        store.set_sequence(model_name, seq)
 
-            model_cls = registry[model_name]
-            store.load_table_data(model_name, payload.get('rows', {}), model_cls)
+        log.info("Loaded %d %s records" % (len(rows), model_name))
 
-            seq = payload.get('sequence', 1)
-            store.set_sequence(model_name, seq)
-
-            count = len(payload.get('rows', {}))
-            log.info("Loaded %d %s records" % (count, model_name))
-        except Exception:
-            log.exception("Failed to load %s" % model_name)
-
-    log.info("Data loaded from %s" % data_dir)
+    log.info("Data loaded from %s" % pickle_path)
 
 
-def backup_rotation(data_dir, keep=5):
-    '''Create a single-file timestamped backup and rotate old ones.'''
+def backup_rotation(data_dir, keep=10):
+    '''Create a timestamped pickle backup and rotate old ones.'''
     backup_dir = os.path.join(data_dir, 'backups')
     os.makedirs(backup_dir, exist_ok=True)
 
+    src = os.path.join(data_dir, 'btpay.db')
+    if not os.path.exists(src):
+        return
+
     timestamp = datetime.datetime.utcnow().strftime('%Y%m%d_%H%M%S')
-
-    # Collect all model data into a single snapshot
-    snapshot = {}
-    for fname in os.listdir(data_dir):
-        if fname.endswith('.json'):
-            fpath = os.path.join(data_dir, fname)
-            with open(fpath, 'r') as f:
-                snapshot[fname] = json.load(f)
-
-    # Write atomically: tmp file + rename
-    dest = os.path.join(backup_dir, 'backup_%s.json' % timestamp)
+    dest = os.path.join(backup_dir, 'backup_%s.db' % timestamp)
     tmp_path = dest + '.tmp'
+
     try:
-        with open(tmp_path, 'w') as f:
-            json.dump(snapshot, f, indent=2)
+        with open(src, 'rb') as fin:
+            data = fin.read()
+        with open(tmp_path, 'wb') as fout:
+            fout.write(data)
         os.replace(tmp_path, dest)
     except Exception:
         log.exception("Failed to create backup")
@@ -149,26 +135,25 @@ def backup_rotation(data_dir, keep=5):
             os.unlink(tmp_path)
         return
 
-    # Remove old backup files
-    backups = sorted([
-        fname for fname in os.listdir(backup_dir)
-        if fname.startswith('backup_') and fname.endswith('.json')
-        and os.path.isfile(os.path.join(backup_dir, fname))
-        and fname != ('backup_%s.json' % timestamp)
-    ])
+    # Remove old backups beyond keep limit
+    backups = sorted(glob.glob(os.path.join(backup_dir, 'backup_*.db')))
+    # Exclude the one we just created
+    backups = [b for b in backups if b != dest]
 
     while len(backups) >= keep:
         old = backups.pop(0)
-        old_path = os.path.join(backup_dir, old)
-        os.unlink(old_path)
+        try:
+            os.unlink(old)
+        except OSError:
+            pass
 
     log.info("Backup created at %s" % dest)
 
 
 class AutoSaver:
-    '''Background thread that periodically saves data to disk.'''
+    '''Background thread that periodically creates backups and runs cleanup.'''
 
-    def __init__(self, data_dir, interval=60, backup_interval=3600, backup_keep=5):
+    def __init__(self, data_dir, interval=60, backup_interval=3600, backup_keep=10):
         self.data_dir = data_dir
         self.interval = interval
         self.backup_interval = backup_interval
@@ -214,8 +199,6 @@ class AutoSaver:
             if self._stop_event.is_set():
                 break
             try:
-                save_to_disk(self.data_dir)
-
                 # Clean up expired sessions periodically
                 try:
                     from btpay.auth.sessions import cleanup_expired_sessions
