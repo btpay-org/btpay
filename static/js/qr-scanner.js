@@ -306,7 +306,14 @@
                 onScanSuccess,
                 function() {} // ignore scan failures (no QR found in frame)
             ).catch(function(err) {
-                if (status) status.textContent = 'Camera error: ' + err;
+                var msg = String(err);
+                if (msg.indexOf('NotAllowedError') !== -1 || msg.indexOf('Permission') !== -1) {
+                    if (status) status.textContent = 'Camera blocked. Click the lock icon in your address bar to allow camera access, then try again.';
+                } else if (msg.indexOf('NotFoundError') !== -1) {
+                    if (status) status.textContent = 'No camera found on this device.';
+                } else {
+                    if (status) status.textContent = 'Camera error: ' + msg;
+                }
             });
         }).catch(function(err) {
             alert('Could not load QR scanner: ' + err.message);
