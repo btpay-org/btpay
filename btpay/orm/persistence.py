@@ -39,6 +39,11 @@ def save_to_disk(data_dir):
     store = MemoryStore()
     os.makedirs(data_dir, exist_ok=True)
 
+    # Debug: compare store identity between AutoSaver and request threads
+    total_raw = sum(len(t) for t in store._tables.values())
+    log.info("save_to_disk: store id=%x, pid=%d, %d raw rows" % (
+        id(store), os.getpid(), total_raw))
+
     models = store.registered_models()
     meta = {
         'schema_version': 1,
