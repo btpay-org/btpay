@@ -100,6 +100,18 @@ def load_from_disk(data_dir):
         log.info("No data directory at %s, starting fresh" % data_dir)
         return
 
+    # Diagnostic: log what files are on disk and their sizes
+    try:
+        files = [(f, os.path.getsize(os.path.join(data_dir, f)))
+                 for f in sorted(os.listdir(data_dir)) if f.endswith('.json')]
+        log.info("Data dir %s: %d JSON files, total %d bytes" % (
+            data_dir, len(files), sum(s for _, s in files)))
+        for fname, size in files:
+            if size > 40:  # non-empty (empty model file is ~33 bytes)
+                log.info("  %s: %d bytes (has data)" % (fname, size))
+    except Exception:
+        pass
+
     from btpay.orm.model import get_model_registry
     registry = get_model_registry()
 
