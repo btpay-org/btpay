@@ -65,7 +65,7 @@ def compute_next_run(template, from_date):
     import pendulum
 
     freq = template.frequency
-    anchor = template.anchor_day or 1
+    anchor = max(template.anchor_day or 1, 1)  # clamp to at least day 1
 
     if freq == 'weekly':
         return from_date.add(weeks=1)
@@ -84,6 +84,8 @@ def compute_next_run(template, from_date):
 
     elif freq == 'custom':
         days = template.custom_interval_days or 1
+        if days < 1:
+            days = 1  # prevent backward/zero advancement
         return from_date.add(days=days)
 
     else:
