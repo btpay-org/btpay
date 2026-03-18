@@ -10,7 +10,19 @@ APP_ROOT = Path(__file__).resolve().parent.parent
 
 
 def get_version():
-    '''Return the installed package version, falling back to __version__.'''
+    '''Return version from git tag, installed package, or __version__.'''
+    # Prefer git tag (handles tag-based updates without changing source)
+    try:
+        result = subprocess.run(
+            ['git', 'describe', '--tags', '--exact-match'],
+            capture_output=True, text=True, timeout=5, cwd=APP_ROOT,
+        )
+        if result.returncode == 0:
+            tag = result.stdout.strip()
+            return tag.lstrip('v') if tag else __version__
+    except Exception:
+        pass
+    # Fall back to installed package metadata
     try:
         from importlib.metadata import version
         return version('btpay')
