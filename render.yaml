@@ -2,7 +2,8 @@ services:
   - type: web
     name: btpay
     runtime: python
-    buildCommand: pip install -r requirements.lock && pip install -e .
+    autoDeploy: false
+    buildCommand: bash deploy/build.sh
     startCommand: gunicorn -c deploy/gunicorn.conf.py wsgi:app
     disk:
       name: btpay-data
