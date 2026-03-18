@@ -53,7 +53,7 @@ def fetch_tags(path, proxy=None):
 
     try:
         result = subprocess.run(
-            ['git', 'fetch', '--tags', '--force', 'origin'],
+            ['git', 'fetch', '--tags', 'origin'],
             capture_output=True, text=True, timeout=_TIMEOUT, cwd=path,
             env=env,
         )
