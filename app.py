@@ -163,6 +163,7 @@ def _import_all_models():
     import btpay.connectors.wire      # WireConnector
     import btpay.connectors.stablecoins  # StablecoinAccount
     import btpay.storefront.models    # Storefront, StorefrontItem
+    import btpay.invoicing.recurring  # RecurringInvoice
 
 
 def _register_middleware(app):
@@ -701,6 +702,13 @@ def _start_background_services(app):
         )
     rate_svc.start()
     app._exchange_rate_service = rate_svc
+
+    # Recurring invoice scheduler
+    if not is_demo:
+        from btpay.invoicing.recurring import RecurringInvoiceScheduler
+        scheduler = RecurringInvoiceScheduler(check_interval=60)
+        scheduler.start()
+        app._recurring_scheduler = scheduler
 
 
 # Entry point for development
