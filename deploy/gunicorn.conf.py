@@ -41,6 +41,25 @@ proc_name = 'btpay'
 # Preload app to share memory (important for single-worker setup)
 preload_app = True
 
+# Signal app to skip background threads during preload (started in post_fork instead)
+os.environ['_GUNICORN_PRELOAD'] = '1'
+
+# Start background services in the worker process (not the master).
+# With preload_app=True, create_app() runs in the master before fork().
+# Starting daemon threads there causes fork-after-threads deadlocks.
+def post_fork(server, worker):
+    '''Start background services after fork so threads live in the worker.'''
+    try:
+        import wsgi
+        app = wsgi.app
+        if not app.config.get('TESTING'):
+            from app import _start_background_services
+            _start_background_services(app)
+            server.log.info('Background services started in worker %s', worker.pid)
+    except Exception as e:
+        server.log.error('Failed to start background services: %s', e)
+
+
 # Graceful shutdown — save data before exit
 def on_exit(server):
     '''Save ORM data on shutdown.'''

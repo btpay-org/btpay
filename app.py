@@ -65,8 +65,9 @@ def create_app(config_override=None):
     # Register CLI commands
     _register_cli(app)
 
-    # Start background services
-    if not app.config.get('TESTING'):
+    # Start background services (skipped when gunicorn preloads in master;
+    # post_fork hook in gunicorn.conf.py starts them in the worker instead)
+    if not app.config.get('TESTING') and not os.environ.get('_GUNICORN_PRELOAD'):
         _start_background_services(app)
 
     return app
