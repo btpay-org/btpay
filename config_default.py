@@ -82,7 +82,10 @@ BACKUP_KEEP = 5                     # number of backups to retain
 
 # ---- Updates ----
 UPDATE_REPO = 'btpay-org/btpay'
-UPDATE_ALLOWED = True
+# Auto-disable in-app updates on managed platforms (Render, Railway, Heroku)
+# where deploys are handled externally. Can be overridden via env var.
+_MANAGED_PLATFORM = any(os.environ.get(v) for v in ('RENDER', 'RAILWAY_ENVIRONMENT', 'DYNO'))
+UPDATE_ALLOWED = os.environ.get('BTPAY_UPDATE_ALLOWED', '' if _MANAGED_PLATFORM else '1').lower() in ('1', 'true', 'yes')
 
 # ---- Reverse Proxy ----
 # Number of trusted reverse proxies in front of the app.

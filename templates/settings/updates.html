@@ -58,6 +58,21 @@
                 </dl>
             </div>
 
+            {% if not update_allowed %}
+            <!-- Managed Platform Notice -->
+            <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-6">
+                <div class="flex">
+                    <svg class="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <div class="ml-3 text-sm text-blue-800 dark:text-blue-300">
+                        <p class="font-medium">Managed platform detected</p>
+                        <p class="mt-1">In-app updates are disabled because this instance is running on a managed hosting platform. Deploy updates through your hosting provider's dashboard or CLI.</p>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+
             <!-- Check for Updates -->
             <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
                 <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase mb-4">Check for Updates</h3>
@@ -186,6 +201,8 @@
                 </table>
             </div>
             {% endif %}
+
+            {% endif %}{# update_allowed #}
 
         </div>
     </div>

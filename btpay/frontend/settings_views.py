@@ -1309,6 +1309,10 @@ def updates_apply():
     """Apply an update (git tag or uploaded ZIP)."""
     _csrf_check()
 
+    if not current_app.config.get('UPDATE_ALLOWED', True):
+        flash('In-app updates are disabled on this platform. Deploy via your hosting provider.', 'error')
+        return redirect(url_for('settings.updates'))
+
     from btpay.version import get_version
     from btpay.updater.checks import pre_update_checks
     from btpay.updater.backup import create_code_backup, create_data_backup, record_update
@@ -1402,6 +1406,10 @@ def updates_apply():
 def updates_rollback():
     """Rollback to a previous version."""
     _csrf_check()
+
+    if not current_app.config.get('UPDATE_ALLOWED', True):
+        flash('In-app updates are disabled on this platform. Deploy via your hosting provider.', 'error')
+        return redirect(url_for('settings.updates'))
 
     from btpay.updater.backup import restore_code_backup, restore_data_backup, get_update_history
     from btpay.updater.restart import pip_install, trigger_restart
