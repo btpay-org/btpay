@@ -29,6 +29,19 @@ def trigger_restart():
         }
 
     try:
+        # Flush ORM data to disk BEFORE spawning new worker.
+        # SIGHUP makes gunicorn spawn a new worker that reads from disk,
+        # then kills the old one. Without this, the new worker loads
+        # stale data because the old worker hasn't saved yet.
+        try:
+            from btpay.orm.persistence import save_to_disk
+            from flask import current_app
+            data_dir = current_app.config.get('DATA_DIR', 'data')
+            save_to_disk(data_dir)
+            log.info('Flushed ORM data to disk before restart')
+        except Exception:
+            log.exception('Failed to flush data before restart')
+
         ppid = os.getppid()
         os.kill(ppid, signal.SIGHUP)
         log.info('Sent SIGHUP to parent process %d', ppid)
