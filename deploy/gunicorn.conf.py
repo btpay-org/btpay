@@ -43,8 +43,22 @@ proc_name = 'btpay'
 # With workers=1 there is no memory benefit to preloading anyway.
 preload_app = False
 
-# Graceful shutdown — handled by the worker's AutoSaver signal handler.
-# Do NOT save from on_exit: with preload_app=False, the master process
-# has an empty MemoryStore and would overwrite the worker's good data.
+# Tell create_app() to skip background services — the master imports wsgi.py
+# to validate the app reference, which runs create_app(). Background services
+# must only run in the worker (post_fork sets _BTPAY_WORKER=1).
+os.environ['_BTPAY_GUNICORN'] = '1'
+
+def post_fork(server, worker):
+    '''Mark this process as a worker and start background services.'''
+    os.environ['_BTPAY_WORKER'] = '1'
+    try:
+        import wsgi
+        app = wsgi.app
+        if not app.config.get('TESTING'):
+            from app import _start_background_services
+            _start_background_services(app)
+            server.log.info('Background services started in worker %s', worker.pid)
+    except Exception as e:
+        server.log.error('Failed to start background services: %s', e)
 
 # EOF

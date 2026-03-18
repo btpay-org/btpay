@@ -70,8 +70,9 @@ def create_app(config_override=None):
     # Register CLI commands
     _register_cli(app)
 
-    # Start background services
-    if not app.config.get('TESTING'):
+    # Start background services (skipped under gunicorn — post_fork starts
+    # them in the worker process only, not the master which also imports wsgi.py)
+    if not app.config.get('TESTING') and not os.environ.get('_BTPAY_GUNICORN'):
         _start_background_services(app)
 
     return app
