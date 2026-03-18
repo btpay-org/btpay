@@ -39,16 +39,6 @@ def save_to_disk(data_dir):
     store = MemoryStore()
     os.makedirs(data_dir, exist_ok=True)
 
-    # Debug: verify singleton identity and raw table state
-    total_raw = sum(len(t) for t in store._tables.values())
-    if total_raw > 0:
-        nonempty_raw = {k: len(v) for k, v in store._tables.items() if v}
-        log.info("save_to_disk: store id=%x, %d raw rows — %s" % (
-            id(store), total_raw, nonempty_raw))
-    else:
-        log.info("save_to_disk: store id=%x, 0 raw rows, tables=%s" % (
-            id(store), list(store._tables.keys())[:5]))
-
     models = store.registered_models()
     meta = {
         'schema_version': 1,

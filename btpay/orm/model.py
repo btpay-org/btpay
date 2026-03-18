@@ -87,10 +87,12 @@ class MemModel(metaclass=MemModelMeta):
         '''Insert or update this instance in the store.'''
         store = MemoryStore()
         model_name = self.__class__.__name__
-        import logging as _log
-        _log.getLogger('btpay.orm.model').debug(
-            "save %s: store id=%x, table rows=%d" % (
-                model_name, id(store), len(store._tables.get(model_name, {}))))
+        if model_name in ('User', 'Organization'):
+            import logging as _log, os as _os, threading as _th
+            _log.getLogger('btpay.orm.model').info(
+                "%s.save: store id=%x, rows=%d, pid=%d, tid=%s" % (
+                    model_name, id(store), len(store._tables.get(model_name, {})),
+                    _os.getpid(), _th.current_thread().name))
 
         # Run before-save hook
         if hasattr(self, '_before_save'):
