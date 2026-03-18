@@ -4,7 +4,7 @@
 # Saves/loads the entire MemoryStore to/from JSON files.
 # Auto-save every N seconds + graceful shutdown save.
 #
-import os, json, threading, signal, logging, datetime, time
+import atexit, os, json, threading, signal, logging, datetime, time
 from decimal import Decimal
 from btpay.orm.engine import MemoryStore
 
@@ -168,7 +168,7 @@ def backup_rotation(data_dir, keep=5):
 class AutoSaver:
     '''Background thread that periodically saves data to disk.'''
 
-    def __init__(self, data_dir, interval=60, backup_interval=3600, backup_keep=5):
+    def __init__(self, data_dir, interval=10, backup_interval=3600, backup_keep=5):
         self.data_dir = data_dir
         self.interval = interval
         self.backup_interval = backup_interval
@@ -192,6 +192,9 @@ class AutoSaver:
                 signal.signal(sig, handler)
             except (OSError, ValueError):
                 pass        # can't set signal handler from non-main thread
+
+        # atexit as fallback — runs even if signal handlers can't be set
+        atexit.register(self.shutdown_save)
 
         log.info("AutoSaver started (interval=%ds)" % self.interval)
 
