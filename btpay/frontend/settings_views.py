@@ -1332,6 +1332,13 @@ def updates_apply():
             flash(' '.join(i['message'] for i in blockers), 'error')
             return redirect(url_for('settings.updates'))
 
+    # Flush in-memory data to disk before backup/update
+    try:
+        from btpay.orm.persistence import save_to_disk
+        save_to_disk(data_dir)
+    except Exception:
+        pass  # best-effort
+
     # Backup
     try:
         code_backup = create_code_backup(app_root, backup_dir, from_version)
