@@ -35,8 +35,8 @@ def trigger_restart():
         # stale data because the old worker hasn't saved yet.
         try:
             from btpay.orm.persistence import save_to_disk
-            from flask import current_app
-            data_dir = current_app.config.get('DATA_DIR', 'data')
+            import config_default
+            data_dir = os.environ.get('BTPAY_DATA_DIR', getattr(config_default, 'DATA_DIR', 'data'))
             save_to_disk(data_dir)
             log.info('Flushed ORM data to disk before restart')
         except Exception:
