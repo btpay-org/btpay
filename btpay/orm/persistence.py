@@ -91,7 +91,15 @@ def save_to_disk(data_dir):
     except OSError:
         pass  # not all filesystems support dir fsync
 
-    log.info("Saved %d models to %s" % (len(models), data_dir))
+    # Log with record counts for debugging persistence issues
+    total_records = sum(len(store.get_table_data(m)) for m in models)
+    nonempty = [(m, len(store.get_table_data(m))) for m in models if store.get_table_data(m)]
+    if nonempty:
+        log.info("Saved %d models (%d records) to %s — %s" % (
+            len(models), total_records, data_dir,
+            ', '.join('%s:%d' % (m, n) for m, n in nonempty)))
+    else:
+        log.info("Saved %d models (0 records) to %s" % (len(models), data_dir))
 
 
 def load_from_disk(data_dir):
