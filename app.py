@@ -18,6 +18,11 @@ def create_app(config_override=None):
     # Load config
     _load_config(app, config_override)
 
+    # Check for production mode flag (written by "Go Live" exit-demo flow)
+    data_dir = app.config.get('DATA_DIR', 'data')
+    if os.path.exists(os.path.join(data_dir, '_production_mode')):
+        app.config['DEMO_MODE'] = False
+
     # Apply ProxyFix when behind a reverse proxy (nginx, Caddy, etc.)
     num_proxies = app.config.get('NUM_PROXIES', 0)
     if num_proxies:

@@ -391,10 +391,12 @@ def change_password():
 
 @auth_bp.route('/login', methods=['GET'])
 def login_page():
-    '''Login page.'''
-    from flask import render_template
-    allow_register = User.query.count() == 0
-    return render_template('auth/login.html', allow_register=allow_register)
+    '''Login page. Redirects to register if no users exist.'''
+    from flask import render_template, flash
+    if User.query.count() == 0:
+        flash('No accounts exist yet. Create your first admin account.', 'info')
+        return redirect(url_for('auth.register_page'))
+    return render_template('auth/login.html', allow_register=False)
 
 
 @auth_bp.route('/register', methods=['GET'])

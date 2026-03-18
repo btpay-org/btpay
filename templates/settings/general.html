@@ -104,6 +104,28 @@
                     </button>
                 </div>
             </form>
+
+            {% if demo_mode %}
+            <!-- Go Live -->
+            <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl p-6 mt-6">
+                <h3 class="text-sm font-medium text-yellow-800 dark:text-yellow-300 uppercase mb-3">Go Live</h3>
+                <p class="text-sm text-yellow-700 dark:text-yellow-400 mb-4">
+                    This instance is running in demo mode with sample data. Going live will permanently erase all demo data and restart the app for first-time setup.
+                </p>
+                <form method="POST" action="{{ url_for('settings.exit_demo') }}"
+                      onsubmit="return confirm('This will erase ALL demo data and restart the app. You will need to register a new admin account. Continue?')">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                    <button type="submit"
+                            class="inline-flex items-center px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 text-sm font-medium">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                        </svg>
+                        Exit Demo &amp; Go Live
+                    </button>
+                </form>
+            </div>
+            {% endif %}
+
         </div>
     </div>
 </div>

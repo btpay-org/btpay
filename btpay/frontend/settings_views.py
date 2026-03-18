@@ -39,7 +39,57 @@ def general():
         flash('Settings saved', 'success')
         return redirect(url_for('settings.general'))
 
-    return render_template('settings/general.html', org=g.org)
+    return render_template('settings/general.html', org=g.org,
+                           demo_mode=current_app.config.get('DEMO_MODE', False))
+
+
+@settings_bp.route('/exit-demo', methods=['POST'])
+@login_required
+@role_required('owner')
+def exit_demo():
+    '''Exit demo mode: clear demo data, switch to production, restart.'''
+    _csrf_check()
+
+    if not current_app.config.get('DEMO_MODE'):
+        flash('Not in demo mode.', 'error')
+        return redirect(url_for('settings.general'))
+
+    # Clear all demo data
+    from btpay.demo.seed import reset_demo_data
+    from btpay.orm.engine import MemoryStore
+    store = MemoryStore()
+    for table_name in list(store._tables.keys()):
+        store._tables[table_name].clear()
+        store._sequences[table_name] = 1
+
+    # Write production mode flag to data dir
+    data_dir = current_app.config.get('DATA_DIR', 'data')
+    os.makedirs(data_dir, exist_ok=True)
+    flag_path = os.path.join(data_dir, '_production_mode')
+    with open(flag_path, 'w') as f:
+        f.write('1')
+
+    # Save empty state to disk
+    from btpay.orm.persistence import save_to_disk
+    save_to_disk(data_dir)
+
+    # Disable demo mode in running config
+    current_app.config['DEMO_MODE'] = False
+
+    log.info('Exited demo mode — production flag written to %s', flag_path)
+
+    # Restart worker to pick up new config
+    from btpay.updater.restart import is_gunicorn, trigger_restart
+    if is_gunicorn():
+        import threading
+        def _delayed_restart():
+            import time
+            time.sleep(1)
+            trigger_restart()
+        threading.Thread(target=_delayed_restart, daemon=True).start()
+
+    flash('Demo mode disabled. Register your admin account to get started.', 'success')
+    return redirect(url_for('auth.login_page'))
 
 
 # ---- Connectors: Bitcoin Wallets ----
