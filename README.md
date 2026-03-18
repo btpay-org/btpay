@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://btpay.org">
-    <img src="art/btpay-logo.svg" alt="BTPay" height="60">
+    <img src="art/btpay-logo.svg" alt="BTPay" height="120">
   </a>
 </p>
 
@@ -9,10 +9,9 @@
   No third parties. No monthly fees. Full control of your keys.
 </p>
 
-> **Alpha Software** -- BTPay is in early alpha and under active development. Things may change. Please test thoroughly before using in production and keep regular backups.
-
 <p align="center">
   <a href="https://btpay-demo.onrender.com/">Live Demo</a> ·
+  <a href="https://donate.btpay.org/s/test-a-donation">Test a Donation</a> ·
   <a href="https://btpay.org">Website</a> ·
   <a href="#quick-start">Quick Start</a> ·
   <a href="docs/API.md">API Reference</a> ·
@@ -20,6 +19,8 @@
   <a href="docs/DEPLOYMENT.md">Deployment</a> ·
   <a href="#license">License</a>
 </p>
+
+> **Alpha Software** -- BTPay is in early alpha and under active development. Things may change. Please test thoroughly before using in production and keep regular backups.
 
 <p align="center">
   <a href="https://render.com/deploy?repo=https://github.com/btpay-org/btpay"><img src="https://render.com/images/deploy-to-render-button.svg" alt="Deploy to Render" height="28"></a>
