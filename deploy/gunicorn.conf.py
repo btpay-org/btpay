@@ -38,19 +38,13 @@ limit_request_field_size = 8190
 # Process naming
 proc_name = 'btpay'
 
-# Preload app to share memory (important for single-worker setup)
-preload_app = True
+# Do NOT use preload_app with this app. The in-memory ORM, background
+# threads, and Python's fork-after-threads problem cause worker deadlocks.
+# With workers=1 there is no memory benefit to preloading anyway.
+preload_app = False
 
-# Graceful shutdown — save data before exit
-def on_exit(server):
-    '''Save ORM data on shutdown.'''
-    try:
-        from btpay.orm.persistence import save_to_disk
-        import config_default
-        data_dir = os.environ.get('BTPAY_DATA_DIR', getattr(config_default, 'DATA_DIR', 'data'))
-        save_to_disk(data_dir)
-        server.log.info('Data saved on shutdown')
-    except Exception as e:
-        server.log.error('Failed to save data on shutdown: %s', e)
+# Graceful shutdown — handled by the worker's AutoSaver signal handler.
+# Do NOT save from on_exit: with preload_app=False, the master process
+# has an empty MemoryStore and would overwrite the worker's good data.
 
 # EOF
