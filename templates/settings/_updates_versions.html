@@ -11,23 +11,23 @@
     <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-3">
         <div class="flex items-center justify-between">
             <div class="flex items-center gap-2">
-                <span class="font-mono text-sm font-medium">{{ release.tag_name }}</span>
+                <span class="font-mono text-sm font-medium">{{ release.tag }}</span>
                 {% if release.tag_name == current_version or release.tag_name == 'v' + current_version %}
                 <span class="px-2 py-0.5 text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 rounded font-medium">Current</span>
                 {% endif %}
                 {% if release.prerelease %}
                 <span class="px-2 py-0.5 text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 rounded">Pre-release</span>
                 {% endif %}
-                {% if release.published_at %}
-                <span class="text-xs text-gray-400">{{ release.published_at[:10] }}</span>
+                {% if release.date %}
+                <span class="text-xs text-gray-400">{{ release.date[:10] }}</span>
                 {% endif %}
             </div>
             {% if release.tag_name != current_version and release.tag_name != 'v' + current_version %}
             <form method="POST" action="{{ url_for('settings.updates_apply') }}" class="inline"
-                  onsubmit="return confirm('Update to {{ release.tag_name }}? A backup will be created and the server will restart.')">
+                  onsubmit="return confirm('Update to {{ release.tag }}? A backup will be created and the server will restart.')">
                 <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
                 <input type="hidden" name="method" value="git">
-                <input type="hidden" name="version" value="{{ release.tag_name }}">
+                <input type="hidden" name="version" value="{{ release.tag }}">
                 <button type="submit"
                         class="inline-flex items-center px-3 py-1.5 bg-brand text-white rounded-lg hover:opacity-90 text-xs font-medium">
                     Update
@@ -53,20 +53,20 @@
     <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-3">
         <div class="flex items-center justify-between">
             <div class="flex items-center gap-2">
-                <span class="font-mono text-sm">{{ tag.name }}</span>
-                {% if tag.name == current_version or tag.name == 'v' + current_version %}
+                <span class="font-mono text-sm">{{ tag.tag }}</span>
+                {% if tag.tag == current_version or tag.tag == 'v' + current_version %}
                 <span class="px-2 py-0.5 text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 rounded font-medium">Current</span>
                 {% endif %}
-                {% if tag.date %}
-                <span class="text-xs text-gray-400">{{ tag.date[:10] }}</span>
+                {% if tag.commit %}
+                <span class="text-xs text-gray-400 font-mono">{{ tag.commit[:7] }}</span>
                 {% endif %}
             </div>
             {% if tag.name != current_version and tag.name != 'v' + current_version %}
             <form method="POST" action="{{ url_for('settings.updates_apply') }}" class="inline"
-                  onsubmit="return confirm('Update to {{ tag.name }}? A backup will be created and the server will restart.')">
+                  onsubmit="return confirm('Update to {{ tag.tag }}? A backup will be created and the server will restart.')">
                 <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
                 <input type="hidden" name="method" value="git">
-                <input type="hidden" name="version" value="{{ tag.name }}">
+                <input type="hidden" name="version" value="{{ tag.tag }}">
                 <button type="submit"
                         class="inline-flex items-center px-3 py-1.5 bg-brand text-white rounded-lg hover:opacity-90 text-xs font-medium">
                     Update
