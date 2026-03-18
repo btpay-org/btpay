@@ -61,6 +61,8 @@ def save_to_disk(data_dir):
         try:
             with open(tmp_path, 'w') as f:
                 json.dump(payload, f, cls=BTPayEncoder, indent=2)
+                f.flush()
+                os.fsync(f.fileno())
             os.replace(tmp_path, fpath)
         except Exception:
             log.exception("Failed to save %s" % model_name)
@@ -73,11 +75,21 @@ def save_to_disk(data_dir):
     try:
         with open(meta_tmp, 'w') as f:
             json.dump(meta, f, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
         os.replace(meta_tmp, meta_path)
     except Exception:
         log.exception("Failed to save _meta.json")
         if os.path.exists(meta_tmp):
             os.unlink(meta_tmp)
+
+    # Sync directory to ensure renames are durable on disk
+    try:
+        fd = os.open(data_dir, os.O_RDONLY)
+        os.fsync(fd)
+        os.close(fd)
+    except OSError:
+        pass  # not all filesystems support dir fsync
 
     log.info("Saved %d models to %s" % (len(models), data_dir))
 
