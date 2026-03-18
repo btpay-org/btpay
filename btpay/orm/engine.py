@@ -3,12 +3,10 @@
 # All model data lives in Python dicts, protected by a reentrant lock.
 #
 import threading
-from btpay.misc import singleton
 from btpay.orm.indexing import HashIndex, UniqueIndex
 
 
-@singleton
-class MemoryStore:
+class _MemoryStoreImpl:
     '''
     Central in-memory storage engine. Singleton.
 
@@ -201,5 +199,17 @@ class MemoryStore:
     def registered_models(self):
         with self._lock:
             return list(self._tables.keys())
+
+
+# Module-level singleton — all imports of MemoryStore get the same instance.
+# This replaces the @singleton decorator which was unreliable under gunicorn gthread.
+_instance = _MemoryStoreImpl()
+
+def MemoryStore():
+    '''Return the single MemoryStore instance.'''
+    return _instance
+
+# Preserve the interface expected by code that checks MemoryStore._cls
+MemoryStore._cls = _MemoryStoreImpl
 
 # EOF
