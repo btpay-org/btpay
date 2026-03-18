@@ -67,10 +67,17 @@ def save_to_disk(data_dir):
             if os.path.exists(tmp_path):
                 os.unlink(tmp_path)
 
-    # Save meta
+    # Save meta (atomic write — truncated meta breaks load)
     meta_path = os.path.join(data_dir, '_meta.json')
-    with open(meta_path, 'w') as f:
-        json.dump(meta, f, indent=2)
+    meta_tmp = meta_path + '.tmp'
+    try:
+        with open(meta_tmp, 'w') as f:
+            json.dump(meta, f, indent=2)
+        os.replace(meta_tmp, meta_path)
+    except Exception:
+        log.exception("Failed to save _meta.json")
+        if os.path.exists(meta_tmp):
+            os.unlink(meta_tmp)
 
     log.info("Saved %d models to %s" % (len(models), data_dir))
 
@@ -89,8 +96,12 @@ def load_from_disk(data_dir):
         log.info("No _meta.json in %s, starting fresh" % data_dir)
         return
 
-    with open(meta_path, 'r') as f:
-        meta = json.load(f)
+    try:
+        with open(meta_path, 'r') as f:
+            meta = json.load(f)
+    except (json.JSONDecodeError, ValueError):
+        log.error("Corrupt _meta.json in %s, starting fresh" % data_dir)
+        return
 
     store = MemoryStore()
 
