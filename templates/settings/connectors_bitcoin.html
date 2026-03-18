@@ -32,9 +32,13 @@
                         {% endif %}
                     </div>
                 </div>
-                <div class="mt-3 flex items-center space-x-4 text-sm text-gray-500">
-                    <span>Index: {{ w.next_address_index }}</span>
-                    <span>Gap limit: {{ w.gap_limit }}</span>
+                <div class="mt-3 flex items-center justify-between text-sm text-gray-500">
+                    <div class="flex items-center space-x-4">
+                        <span>Index: {{ w.next_address_index }}</span>
+                        <span>Gap limit: {{ w.gap_limit }}</span>
+                    </div>
+                    <button type="button" onclick="confirmDeleteWallet({{ w.id }}, '{{ w.name|e }}')"
+                            class="text-xs text-red-500 hover:text-red-700 underline">Remove</button>
                 </div>
             </div>
             {% endfor %}
@@ -118,6 +122,33 @@
     </div>
 </div>
 
+<!-- Delete wallet confirmation modal -->
+<div id="delete-wallet-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 max-w-md w-full mx-4">
+        <h3 class="text-lg font-bold text-red-600 dark:text-red-400 mb-2">Delete Wallet</h3>
+        <p class="text-sm text-gray-600 dark:text-gray-300 mb-1">
+            This will permanently remove the wallet and cannot be undone.
+        </p>
+        <p class="text-sm text-gray-600 dark:text-gray-300 mb-4">
+            Type <strong id="delete-wallet-name-display" class="font-mono"></strong> to confirm:
+        </p>
+        <form id="delete-wallet-form" method="POST">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+            <input type="text" id="delete-wallet-confirm-input" name="confirm_name" autocomplete="off"
+                   placeholder="Type wallet name here"
+                   class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 font-mono text-sm mb-4">
+            <div class="flex justify-end space-x-3">
+                <button type="button" onclick="closeDeleteModal()"
+                        class="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200">Cancel</button>
+                <button type="submit" id="delete-wallet-btn" disabled
+                        class="px-4 py-2 text-sm bg-red-600 text-white rounded-lg opacity-50 cursor-not-allowed">
+                    Delete Wallet
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script src="{{ url_for('static', filename='js/qr-scanner.js') }}"></script>
 <script>
 function toggleWalletFields() {
@@ -126,5 +157,38 @@ function toggleWalletFields() {
     document.getElementById('descriptor-field').classList.toggle('hidden', t !== 'descriptor');
     document.getElementById('addresses-field').classList.toggle('hidden', t !== 'address_list');
 }
+
+var _deleteWalletName = '';
+function confirmDeleteWallet(walletId, walletName) {
+    _deleteWalletName = walletName;
+    var modal = document.getElementById('delete-wallet-modal');
+    var form = document.getElementById('delete-wallet-form');
+    var input = document.getElementById('delete-wallet-confirm-input');
+    var btn = document.getElementById('delete-wallet-btn');
+    var display = document.getElementById('delete-wallet-name-display');
+    form.action = '{{ url_for("settings.connectors_bitcoin") }}/' + walletId + '/delete';
+    display.textContent = walletName;
+    input.value = '';
+    btn.disabled = true;
+    btn.classList.add('opacity-50', 'cursor-not-allowed');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    input.focus();
+}
+function closeDeleteModal() {
+    var modal = document.getElementById('delete-wallet-modal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+}
+document.getElementById('delete-wallet-confirm-input').addEventListener('input', function() {
+    var btn = document.getElementById('delete-wallet-btn');
+    var match = this.value.trim() === _deleteWalletName;
+    btn.disabled = !match;
+    btn.classList.toggle('opacity-50', !match);
+    btn.classList.toggle('cursor-not-allowed', !match);
+});
+document.getElementById('delete-wallet-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeDeleteModal();
+});
 </script>
 {% endblock %}

@@ -150,6 +150,29 @@ def connectors_bitcoin():
     return render_template('settings/connectors_bitcoin.html', wallets=wallet_list, org=g.org)
 
 
+@settings_bp.route('/connectors/bitcoin/<int:wallet_id>/delete', methods=['POST'])
+@login_required
+@role_required('admin')
+@csrf_protect
+def delete_wallet(wallet_id):
+    from btpay.bitcoin.models import Wallet
+    wallet = Wallet.get(wallet_id)
+    if wallet is None or wallet.org_id != g.org.id:
+        flash('Wallet not found', 'error')
+        return redirect(url_for('settings.connectors_bitcoin'))
+
+    # Double confirmation: form must include the wallet name typed by the user
+    confirm_name = request.form.get('confirm_name', '').strip()
+    if confirm_name != wallet.name:
+        flash('Wallet name does not match. Deletion cancelled.', 'error')
+        return redirect(url_for('settings.connectors_bitcoin'))
+
+    label = wallet.name
+    wallet.delete()
+    flash('Wallet removed: %s' % label, 'success')
+    return redirect(url_for('settings.connectors_bitcoin'))
+
+
 # ---- Connectors: Wire Transfer ----
 
 @settings_bp.route('/connectors/wire', methods=['GET', 'POST'])
