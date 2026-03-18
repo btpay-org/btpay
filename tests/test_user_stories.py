@@ -956,8 +956,16 @@ class TestStory_AuthEdgeCases:
         })
         assert resp.status_code in (400, 401, 403)
 
-    def test_login_page_renders(self, app):
+    def test_login_page_redirects_to_register_when_no_users(self, app):
         client = app.test_client()
+        resp = client.get('/auth/login')
+        # With 0 users, login redirects to register
+        assert resp.status_code == 302
+        assert '/auth/register' in resp.headers['Location']
+
+    def test_login_page_renders_when_users_exist(self, app):
+        client = app.test_client()
+        _register(client)
         resp = client.get('/auth/login')
         assert resp.status_code == 200
 
