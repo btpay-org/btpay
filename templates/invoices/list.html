@@ -4,6 +4,10 @@
 <div class="flex justify-between items-center mb-6">
     <h2 class="text-2xl font-bold">Invoices</h2>
     <div class="flex items-center space-x-2">
+        <a href="{{ url_for('invoices.recurring_list') }}"
+           class="px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+            Recurring
+        </a>
         <a href="{{ url_for('invoices.export_csv', status=request.args.get('status', ''), q=request.args.get('q', ''), date_from=request.args.get('date_from', ''), date_to=request.args.get('date_to', '')) }}"
            class="px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
             Export CSV
