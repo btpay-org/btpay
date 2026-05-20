@@ -8,7 +8,7 @@ import logging
 from decimal import Decimal, InvalidOperation
 from flask import Blueprint, request, jsonify, g, current_app
 
-from btpay.auth.decorators import api_auth
+from btpay.auth.decorators import api_auth, api_permission
 
 log = logging.getLogger(__name__)
 
@@ -19,6 +19,7 @@ api_bp = Blueprint('api', __name__, url_prefix='/api/v1')
 
 @api_bp.route('/invoices', methods=['GET'])
 @api_auth
+@api_permission('invoices:read')
 def list_invoices():
     '''List invoices for the current org.'''
     from btpay.invoicing.models import Invoice
@@ -45,6 +46,7 @@ def list_invoices():
 
 @api_bp.route('/invoices', methods=['POST'])
 @api_auth
+@api_permission('invoices:write')
 def create_invoice():
     '''Create a new invoice.'''
     from btpay.invoicing.service import InvoiceService
@@ -86,6 +88,7 @@ def create_invoice():
 
 @api_bp.route('/invoices/<ref>', methods=['GET'])
 @api_auth
+@api_permission('invoices:read')
 def get_invoice(ref):
     '''Get invoice by reference number or invoice number.'''
     inv = _lookup_invoice(ref)
@@ -99,6 +102,7 @@ def get_invoice(ref):
 
 @api_bp.route('/invoices/<ref>/finalize', methods=['POST'])
 @api_auth
+@api_permission('invoices:write')
 def finalize_invoice(ref):
     '''Finalize a draft invoice (assign address, lock rate).'''
     from btpay.invoicing.service import InvoiceService
@@ -131,6 +135,7 @@ def finalize_invoice(ref):
 
 @api_bp.route('/invoices/<ref>/status', methods=['GET'])
 @api_auth
+@api_permission('invoices:read')
 def invoice_status(ref):
     '''Get invoice payment status (lightweight).'''
     inv = _lookup_invoice(ref)
@@ -149,6 +154,7 @@ def invoice_status(ref):
 
 @api_bp.route('/invoices/<ref>', methods=['DELETE'])
 @api_auth
+@api_permission('invoices:write')
 def cancel_invoice(ref):
     '''Cancel a draft or pending invoice.'''
     from btpay.invoicing.service import InvoiceService
@@ -170,6 +176,7 @@ def cancel_invoice(ref):
 
 @api_bp.route('/payment-links', methods=['GET'])
 @api_auth
+@api_permission('invoices:read')
 def list_payment_links():
     '''List payment links for the current org.'''
     from btpay.invoicing.models import PaymentLink
@@ -181,6 +188,7 @@ def list_payment_links():
 
 @api_bp.route('/payment-links', methods=['POST'])
 @api_auth
+@api_permission('invoices:write')
 def create_payment_link():
     '''Create a new payment link.'''
     from btpay.invoicing.models import PaymentLink
@@ -227,6 +235,7 @@ def create_payment_link():
 
 @api_bp.route('/payment-links/<slug>', methods=['DELETE'])
 @api_auth
+@api_permission('invoices:write')
 def delete_payment_link(slug):
     '''Deactivate a payment link.'''
     from btpay.invoicing.models import PaymentLink
@@ -244,6 +253,7 @@ def delete_payment_link(slug):
 
 @api_bp.route('/rates', methods=['GET'])
 @api_auth
+@api_permission('rates:read')
 def get_rates():
     '''Get current exchange rates.'''
     from btpay.api.serializers import serialize_rate
@@ -262,6 +272,7 @@ def get_rates():
 
 @api_bp.route('/webhooks', methods=['GET'])
 @api_auth
+@api_permission('webhooks:read')
 def list_webhooks():
     '''List webhook endpoints for the current org.'''
     from btpay.api.webhook_models import WebhookEndpoint
@@ -278,6 +289,7 @@ def list_webhooks():
 
 @api_bp.route('/webhooks', methods=['POST'])
 @api_auth
+@api_permission('webhooks:write')
 def create_webhook():
     '''Register a new webhook endpoint.'''
     from btpay.api.webhook_models import WebhookEndpoint
@@ -319,6 +331,7 @@ def create_webhook():
 
 @api_bp.route('/webhooks/<int:webhook_id>', methods=['DELETE'])
 @api_auth
+@api_permission('webhooks:write')
 def delete_webhook(webhook_id):
     '''Delete a webhook endpoint.'''
     from btpay.api.webhook_models import WebhookEndpoint

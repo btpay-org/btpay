@@ -324,6 +324,19 @@ def client(app):
     return app.test_client()
 
 
+def _extract_cookie(resp, name='btpay_session'):
+    for header in resp.headers.getlist('Set-Cookie'):
+        if header.startswith(name + '='):
+            return header.split('=', 1)[1].split(';')[0]
+    return ''
+
+
+def _csrf_headers(client, session_token):
+    from btpay.security.csrf import generate_csrf_token
+    secret = client.application.config.get('SECRET_KEY', '')
+    return {'X-CSRF-Token': generate_csrf_token(session_token, secret)}
+
+
 class TestRegisterView:
     def test_register_first_user(self, client):
         rv = client.post('/auth/register', json={
@@ -453,10 +466,12 @@ class TestLoginView:
 
 class TestLogoutView:
     def test_logout(self, client):
-        client.post('/auth/register', json={
+        rv = client.post('/auth/register', json={
             'email': 'logout@test.com', 'password': 'securepassword1',
         })
-        rv = client.post('/auth/logout', content_type='application/json')
+        session_token = _extract_cookie(rv)
+        rv = client.post('/auth/logout', content_type='application/json',
+                         headers=_csrf_headers(client, session_token))
         assert rv.status_code == 200
         assert rv.get_json()['ok'] is True
 
@@ -467,30 +482,32 @@ class TestPasswordChangeView:
         from btpay.auth.views import _limiter
         _limiter._windows.clear()
 
-        client.post('/auth/register', json={
+        reg = client.post('/auth/register', json={
             'email': 'pw@test.com', 'password': 'oldpassword1',
         })
+        session_token = _extract_cookie(reg)
         rv = client.post('/auth/password', json={
             'current_password': 'oldpassword1',
             'new_password': 'newpassword1',
-        })
+        }, headers=_csrf_headers(client, session_token))
         assert rv.status_code == 200
 
         # Login with new password
-        client.post('/auth/logout')
+        client.post('/auth/logout', headers=_csrf_headers(client, session_token))
         rv = client.post('/auth/login', json={
             'email': 'pw@test.com', 'password': 'newpassword1',
         })
         assert rv.status_code == 200
 
     def test_change_password_wrong_current(self, client):
-        client.post('/auth/register', json={
+        reg = client.post('/auth/register', json={
             'email': 'pw2@test.com', 'password': 'oldpassword1',
         })
+        session_token = _extract_cookie(reg)
         rv = client.post('/auth/password', json={
             'current_password': 'wrongpassword',
             'new_password': 'newpassword1',
-        })
+        }, headers=_csrf_headers(client, session_token))
         assert rv.status_code == 401
 
 
@@ -548,9 +565,10 @@ class TestTOTPViews:
         import pyotp
 
         # Register
-        client.post('/auth/register', json={
+        reg = client.post('/auth/register', json={
             'email': 'totp2@test.com', 'password': 'securepassword1',
         })
+        session_token = _extract_cookie(reg)
 
         # Get setup
         rv = client.get('/auth/totp/setup')
@@ -562,7 +580,7 @@ class TestTOTPViews:
         rv = client.post('/auth/totp/enable', json={
             'secret': secret,
             'totp_code': code,
-        })
+        }, headers=_csrf_headers(client, session_token))
         assert rv.status_code == 200
 
         # Verify user has TOTP enabled
@@ -571,7 +589,8 @@ class TestTOTPViews:
 
         # Disable — need a fresh code (wait a bit for new window)
         code2 = totp.now()
-        rv = client.post('/auth/totp/disable', json={'totp_code': code2})
+        rv = client.post('/auth/totp/disable', json={'totp_code': code2},
+                         headers=_csrf_headers(client, session_token))
         # May succeed or fail depending on timing — just check it's handled
         assert rv.status_code in (200, 401)
 
@@ -587,19 +606,21 @@ class TestLoginTOTP:
         _limiter._windows.clear()
 
         # Register user
-        client.post('/auth/register', json={
+        reg = client.post('/auth/register', json={
             'email': 'totplogin@test.com', 'password': 'securepassword1',
         })
+        session_token = _extract_cookie(reg)
 
         # Setup TOTP
         rv = client.get('/auth/totp/setup')
         secret = rv.get_json()['secret']
         totp = pyotp.TOTP(secret)
         code = totp.now()
-        client.post('/auth/totp/enable', json={'secret': secret, 'totp_code': code})
+        client.post('/auth/totp/enable', json={'secret': secret, 'totp_code': code},
+                    headers=_csrf_headers(client, session_token))
 
         # Logout
-        client.post('/auth/logout')
+        client.post('/auth/logout', headers=_csrf_headers(client, session_token))
 
         # Login — should get totp_required
         rv = client.post('/auth/login', json={

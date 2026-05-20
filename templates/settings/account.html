@@ -160,6 +160,8 @@
 
 <script>
 (function() {
+    var csrfToken = '{{ csrf_token }}';
+
     // Format last login timestamp
     var tsEl = document.getElementById('last-login-ts');
     if (tsEl) {
@@ -197,7 +199,7 @@
 
         fetch('{{ url_for("auth.change_password") }}', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken},
             body: JSON.stringify({
                 current_password: document.getElementById('current_password').value,
                 new_password: newPw,
@@ -276,7 +278,7 @@
 
         fetch('{{ url_for("auth.totp_enable") }}', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken},
             body: JSON.stringify({
                 secret: document.getElementById('totp-secret').value,
                 totp_code: code,
@@ -315,7 +317,7 @@
 
         fetch('{{ url_for("auth.totp_disable") }}', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken},
             body: JSON.stringify({totp_code: code})
         })
         .then(function(r) { return r.json().then(function(d) { return {ok: r.ok, data: d}; }); })

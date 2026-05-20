@@ -1122,17 +1122,20 @@ def email():
 @settings_bp.route('/email/test', methods=['POST'])
 @login_required
 @role_required('admin')
+@csrf_protect
 def test_email():
     '''Send a test email to the logged-in user.'''
     from btpay.email.service import EmailService
 
     try:
         svc = EmailService.for_org(g.org, current_app.config)
-        svc.send(
-            to_email=g.user.email,
+        sent = svc.send(
+            to=g.user.email,
             subject='BTPay Test Email',
-            html_body='<h2>Test Email</h2><p>Your email configuration is working.</p>',
+            html='<h2>Test Email</h2><p>Your email configuration is working.</p>',
         )
+        if not sent:
+            return jsonify(error='Email service is not configured or sending failed'), 502
         return jsonify(message='Test email sent to %s' % g.user.email)
     except Exception as e:
         return jsonify(error=str(e)), 500

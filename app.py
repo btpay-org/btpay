@@ -182,10 +182,12 @@ def _register_middleware(app):
         token = request.cookies.get(cookie_name)
         g.user = None
         g.org = None
+        g.session_token = None
         if token:
             result = validate_session(token)
             if result:
                 g.user, g.org = result
+                g.session_token = token
 
     @app.after_request
     def security_headers(response):
@@ -701,6 +703,9 @@ def _start_background_services(app):
         )
     rate_svc.start()
     app._exchange_rate_service = rate_svc
+
+    from btpay.payment_automation import start_payment_automation
+    start_payment_automation(app)
 
 
 # Entry point for development

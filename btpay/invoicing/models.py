@@ -54,8 +54,10 @@ class Invoice(BaseMixin, MemModel):
     @property
     def ref_number(self):
         '''Encrypted reference number for public URLs.'''
-        from btpay.security.refnums import ReferenceNumbers
-        return ReferenceNumbers().pack(self)
+        if 'ref_number' not in self.__dict__:
+            from btpay.security.refnums import ReferenceNumbers
+            self.__dict__['ref_number'] = ReferenceNumbers().pack(self)
+        return self.__dict__['ref_number']
 
     # ---- Properties ----
 

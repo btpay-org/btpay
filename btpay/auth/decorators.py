@@ -113,6 +113,28 @@ def api_auth(f):
     return wrapper
 
 
+def api_permission(permission):
+    '''Require a permission on the API key authenticated by @api_auth.'''
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            api_key = getattr(g, 'api_key', None)
+            if api_key is None:
+                return jsonify(error='API key required'), 401
+
+            permissions = set(api_key.permissions or [])
+            legacy_permission = permission.replace(':', '.')
+            if ('*' not in permissions
+                    and permission not in permissions
+                    and legacy_permission not in permissions):
+                return jsonify(error='Insufficient API permissions'), 403
+
+            return f(*args, **kwargs)
+
+        return wrapper
+    return decorator
+
+
 def csrf_protect(f):
     '''Validate CSRF token on state-changing requests (POST, PUT, DELETE).'''
     @wraps(f)
@@ -129,6 +151,8 @@ def csrf_protect(f):
                 session_id = g.session_token
             elif hasattr(g, 'user') and g.user:
                 session_id = str(g.user.id)
+            else:
+                return f(*args, **kwargs)
 
             secret = current_app.config.get('SECRET_KEY', '')
 

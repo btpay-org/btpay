@@ -15,7 +15,7 @@ from btpay.auth.sessions import (
     create_session, destroy_session,
     set_session_cookie, clear_session_cookie,
 )
-from btpay.auth.decorators import login_required
+from btpay.auth.decorators import login_required, csrf_protect
 
 log = logging.getLogger(__name__)
 
@@ -254,6 +254,7 @@ def login_totp():
 # ---- Logout ----
 
 @auth_bp.route('/logout', methods=['POST'])
+@csrf_protect
 def logout():
     '''Destroy the current session.'''
     cookie_name = current_app.config.get('AUTH_COOKIE_NAME', 'btpay_session')
@@ -294,6 +295,7 @@ def totp_setup():
 
 @auth_bp.route('/totp/enable', methods=['POST'])
 @login_required
+@csrf_protect
 def totp_enable():
     '''Enable TOTP after verifying a code against the provided secret.'''
     # Rate limit TOTP verification to prevent brute-force (6-digit = 1M possibilities)
@@ -325,6 +327,7 @@ def totp_enable():
 
 @auth_bp.route('/totp/disable', methods=['POST'])
 @login_required
+@csrf_protect
 def totp_disable():
     '''Disable TOTP (requires current code to prove device access).'''
     # Rate limit TOTP verification
@@ -352,6 +355,7 @@ def totp_disable():
 
 @auth_bp.route('/password', methods=['POST'])
 @login_required
+@csrf_protect
 def change_password():
     '''Change password (requires current password).'''
     data = request.get_json(silent=True) or request.form

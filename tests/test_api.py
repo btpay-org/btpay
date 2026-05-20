@@ -29,7 +29,7 @@ def _create_user():
     return user
 
 
-def _create_api_key(org, user):
+def _create_api_key(org, user, permissions=None):
     '''Create an API key, return (ApiKey, raw_key_string).'''
     from btpay.auth.models import ApiKey
     from btpay.security.hashing import generate_random_token
@@ -43,7 +43,10 @@ def _create_api_key(org, user):
         key_hash=key_hash,
         key_prefix=raw_key[:8],
         label='Test Key',
-        permissions=['invoices:read', 'invoices:write'],
+        permissions=permissions or [
+            'invoices:read', 'invoices:write',
+            'rates:read', 'webhooks:read', 'webhooks:write',
+        ],
     )
     api_key.save()
     return api_key, raw_key
@@ -322,6 +325,23 @@ class TestEmailService:
         assert svc.is_configured() is True
         assert svc._get('server') == 'org-smtp.example.com'
 
+    def test_for_org_with_settings_page_smtp_keys(self):
+        from btpay.email.service import EmailService
+        org = _create_org()
+        org.smtp_config = {
+            'host': 'smtp-settings.example.com',
+            'port': 587,
+            'user': 'settings-user',
+            'from_addr': 'billing@example.com',
+        }
+        org.save()
+
+        svc = EmailService.for_org(org, {'SMTP_CONFIG': {'server': 'app-smtp.example.com'}})
+        assert svc.is_configured() is True
+        assert svc._get('server') == 'smtp-settings.example.com'
+        assert svc._get('username') == 'settings-user'
+        assert svc._get('from_address') == 'billing@example.com'
+
     def test_for_org_fallback_to_app(self):
         from btpay.email.service import EmailService
         from btpay.dictobj import DictObj
@@ -461,6 +481,20 @@ class TestAPIRoutes:
         resp = client.get('/api/v1/invoices',
                           headers={'Authorization': 'Bearer invalid-key'})
         assert resp.status_code == 401
+
+    def test_scope_rejects_unpermitted_route(self, app):
+        client = app.test_client()
+        with app.app_context():
+            org = _create_org()
+            user = _create_user()
+            api_key, raw_key = _create_api_key(
+                org, user, permissions=['rates:read'])
+
+            resp = client.post('/api/v1/payment-links',
+                               headers=_auth_headers(raw_key),
+                               json={'title': 'Limited Key Link'})
+            assert resp.status_code == 403
+            assert 'permissions' in resp.get_json()['error']
 
     def test_list_invoices_empty(self, app):
         client, org, user, raw_key = self._setup_api(app)

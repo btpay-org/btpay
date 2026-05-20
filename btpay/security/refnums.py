@@ -5,6 +5,7 @@
 # Format: {12 hex chars}-{remaining hex chars} (uppercase)
 #
 import re
+import os
 from nacl.secret import SecretBox
 from btpay.misc import singleton
 
@@ -78,7 +79,8 @@ class ReferenceNumbers:
         '''Encode a model instance into a reference number string.'''
         assert instance.id is not None, "Model not saved?"
         msg = f'{instance.__class__.__name__}:{instance.id}'.encode()
-        enc = self._box.encrypt(msg, self._nonce)[24:]  # strip prepended nonce
+        nonce = os.urandom(SecretBox.NONCE_SIZE)
+        enc = self._box.encrypt(msg, nonce)
         return (enc[0:12].hex() + '-' + enc[12:].hex()).upper()
 
     def unpack(self, s, expect_class=None, just_pk=False):
@@ -91,7 +93,11 @@ class ReferenceNumbers:
             raise ValueError("Bad refnum: %s" % s)
 
         try:
-            raw = self._box.decrypt(self._nonce + msg).decode()
+            try:
+                raw = self._box.decrypt(msg).decode()
+            except Exception:
+                # Legacy refs stored only ciphertext and reused REFNUM_NONCE.
+                raw = self._box.decrypt(self._nonce + msg).decode()
             assert ':' in raw
             cls_name, pk = raw.split(':')
             pk = int(pk)

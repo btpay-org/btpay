@@ -9,6 +9,7 @@ from decimal import Decimal
 from btpay.orm.engine import MemoryStore
 
 log = logging.getLogger(__name__)
+_save_lock = threading.Lock()
 
 
 class BTPayEncoder(json.JSONEncoder):
@@ -36,6 +37,12 @@ def btpay_decoder(obj):
 
 def save_to_disk(data_dir):
     '''Save all model data to JSON files in data_dir.'''
+    with _save_lock:
+        return _save_to_disk_locked(data_dir)
+
+
+def _save_to_disk_locked(data_dir):
+    '''Save all model data. Caller must hold _save_lock.'''
     store = MemoryStore()
     os.makedirs(data_dir, exist_ok=True)
 
@@ -224,8 +231,12 @@ class AutoSaver:
         self._thread = None
         self._stop_event = threading.Event()
         self._last_backup = time.time()
+        self._atexit_registered = False
+        self._atexit_handler = None
 
     def start(self):
+        if self._thread and self._thread.is_alive():
+            return
         self._thread = threading.Thread(target=self._run, daemon=True, name='autosave')
         self._thread.start()
 
@@ -242,7 +253,10 @@ class AutoSaver:
                 pass        # can't set signal handler from non-main thread
 
         # atexit as fallback — runs even if signal handlers can't be set
-        atexit.register(self.shutdown_save)
+        if not self._atexit_registered:
+            self._atexit_handler = self.shutdown_save
+            atexit.register(self._atexit_handler)
+            self._atexit_registered = True
 
         log.info("AutoSaver started (interval=%ds)" % self.interval)
 
@@ -250,14 +264,26 @@ class AutoSaver:
         self._stop_event.set()
         if self._thread:
             self._thread.join(timeout=5)
+            self._thread = None
+        if self._atexit_registered:
+            try:
+                atexit.unregister(self._atexit_handler)
+            except ValueError:
+                pass
+            self._atexit_registered = False
+            self._atexit_handler = None
 
     def shutdown_save(self):
         '''Save on shutdown.'''
+        old_raise = logging.raiseExceptions
+        logging.raiseExceptions = False
         try:
             save_to_disk(self.data_dir)
             log.info("Shutdown save complete")
         except Exception:
             log.exception("Shutdown save failed")
+        finally:
+            logging.raiseExceptions = old_raise
 
     def _run(self):
         while not self._stop_event.is_set():

@@ -5,6 +5,7 @@
 #
 import logging
 import smtplib
+from email.utils import formataddr
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
@@ -35,7 +36,7 @@ class EmailService:
         if org_smtp.get('mailgun_api_key') and org_smtp.get('mailgun_domain'):
             return MailgunEmailService(org_smtp)
 
-        if org_smtp and org_smtp.get('server'):
+        if org_smtp and (org_smtp.get('server') or org_smtp.get('host')):
             return cls(org_smtp)
         return cls(app_config.get('SMTP_CONFIG', {}))
 
@@ -60,6 +61,8 @@ class EmailService:
         password = self._get('password', '')
         use_tls = self._get('use_tls', True)
         sender = from_address or self._get('from_address', 'noreply@localhost')
+        from_name = self._get('from_name', '')
+        envelope_sender = sender
 
         # Sanitize all header values to prevent header injection
         def _sanitize_header(val):
@@ -68,11 +71,13 @@ class EmailService:
             return val
 
         sender = _sanitize_header(sender)
+        envelope_sender = _sanitize_header(envelope_sender)
+        from_name = _sanitize_header(from_name)
         subject = _sanitize_header(subject)
 
         # Build message
         msg = MIMEMultipart('alternative')
-        msg['From'] = sender
+        msg['From'] = formataddr((from_name, sender)) if from_name else sender
         msg['To'] = _sanitize_header(to if isinstance(to, str) else ', '.join(to))
         msg['Subject'] = subject
 
@@ -107,7 +112,7 @@ class EmailService:
             if username and password:
                 smtp.login(username, password)
 
-            smtp.sendmail(sender, recipients, msg.as_string())
+            smtp.sendmail(envelope_sender, recipients, msg.as_string())
             smtp.quit()
 
             log.info('Email sent to %s: %s', to, subject)
@@ -182,10 +187,23 @@ class EmailService:
 
     def _get(self, key, default=None):
         '''Get config value — works with dict or DictObj.'''
-        if hasattr(self.config, key):
-            return getattr(self.config, key, default) or default
-        if isinstance(self.config, dict):
-            return self.config.get(key, default) or default
+        aliases = {
+            'server': ('server', 'host'),
+            'host': ('host', 'server'),
+            'username': ('username', 'user'),
+            'user': ('user', 'username'),
+            'from_address': ('from_address', 'from_addr'),
+            'from_addr': ('from_addr', 'from_address'),
+        }
+        for candidate in aliases.get(key, (key,)):
+            if hasattr(self.config, candidate):
+                value = getattr(self.config, candidate, None)
+                if value not in (None, ''):
+                    return value
+            if isinstance(self.config, dict) and candidate in self.config:
+                value = self.config.get(candidate)
+                if value not in (None, ''):
+                    return value
         return default
 
 

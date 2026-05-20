@@ -157,6 +157,7 @@ def export_csv():
 @invoices_bp.route('/create', methods=['GET', 'POST'])
 @login_required
 @role_required('admin')
+@csrf_protect
 def create():
     '''Create a new invoice.'''
     from btpay.invoicing.models import Invoice, InvoiceLine

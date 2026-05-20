@@ -36,10 +36,10 @@ def _login(client, email='user@test.com', password='securepass123'):
 
 def _auth_setup(app):
     '''Register + login, return (client, user, org, session_token).'''
-    client = app.test_client()
-    resp = _register(client, 'owner@test.com', 'securepass123')
+    raw_client = app.test_client()
+    resp = _register(raw_client, 'owner@test.com', 'securepass123')
     assert resp.status_code == 201
-    resp = _login(client, 'owner@test.com', 'securepass123')
+    resp = _login(raw_client, 'owner@test.com', 'securepass123')
     assert resp.status_code == 200
 
     user = User.get_by(email='owner@test.com')
@@ -51,6 +51,7 @@ def _auth_setup(app):
     cookie_name = app.config.get('AUTH_COOKIE_NAME', 'btpay_session')
     session_token = _extract_cookie(resp, cookie_name)
 
+    client = _CsrfAuthClient(raw_client, app, session_token)
     return client, user, org, session_token
 
 
@@ -67,6 +68,40 @@ def _csrf_token(session_token, app):
     from btpay.security.csrf import generate_csrf_token
     secret = app.config.get('SECRET_KEY', '')
     return generate_csrf_token(session_token, secret)
+
+
+class _CsrfAuthClient:
+    '''Test-client wrapper that mirrors browser CSRF headers for auth JSON routes.'''
+
+    _AUTH_CSRF_PATHS = {
+        '/auth/logout',
+        '/auth/password',
+        '/auth/totp/enable',
+        '/auth/totp/disable',
+    }
+
+    def __init__(self, client, app, session_token):
+        self._client = client
+        self._app = app
+        self._session_token = session_token
+
+    def __getattr__(self, name):
+        return getattr(self._client, name)
+
+    def post(self, *args, **kwargs):
+        path = args[0] if args else kwargs.get('path', '')
+        if path in self._AUTH_CSRF_PATHS:
+            headers = dict(kwargs.get('headers') or {})
+            headers.setdefault('X-CSRF-Token',
+                               _csrf_token(self._session_token, self._app))
+            kwargs['headers'] = headers
+
+        resp = self._client.post(*args, **kwargs)
+        token = _extract_cookie(
+            resp, self._app.config.get('AUTH_COOKIE_NAME', 'btpay_session'))
+        if token:
+            self._session_token = token
+        return resp
 
 
 def _create_wallet(org, wallet_type='xpub', network='testnet'):
@@ -4005,12 +4040,14 @@ class TestStory_PasswordEdgeCases:
         Membership(user_id=viewer.id, org_id=org.id, role='viewer').save()
 
         c2 = app.test_client()
-        _login(c2, 'viewer@test.com', 'viewerpass123')
+        login_resp = _login(c2, 'viewer@test.com', 'viewerpass123')
+        viewer_token = _extract_cookie(
+            login_resp, app.config.get('AUTH_COOKIE_NAME', 'btpay_session'))
 
         resp = c2.post('/auth/password', json={
             'current_password': 'viewerpass123',
             'new_password': 'newviewerpass456',
-        })
+        }, headers={'X-CSRF-Token': _csrf_token(viewer_token, app)})
         assert resp.status_code == 200
 
 

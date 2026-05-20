@@ -118,6 +118,34 @@ def test_unique_refnums_for_different_objects():
     assert pk2 == obj2.id
 
 
+def test_fresh_nonce_for_same_object():
+    '''Packing the same object twice must use different SecretBox nonces.'''
+    rn = ReferenceNumbers()
+    obj = RefTestModel(name='nonce_test')
+    obj.save()
+
+    ref1 = rn.pack(obj)
+    ref2 = rn.pack(obj)
+    assert ref1 != ref2
+    assert rn.unpack(ref1, just_pk=True)[1] == obj.id
+    assert rn.unpack(ref2, just_pk=True)[1] == obj.id
+
+
+def test_legacy_static_nonce_refnum_still_decodes():
+    '''Existing refs without embedded nonce remain valid after the format fix.'''
+    rn = ReferenceNumbers()
+    obj = RefTestModel(name='legacy_nonce_test')
+    obj.save()
+
+    msg = f'{obj.__class__.__name__}:{obj.id}'.encode()
+    legacy = rn._box.encrypt(msg, rn._nonce)[24:]
+    legacy_ref = (legacy[0:12].hex() + '-' + legacy[12:].hex()).upper()
+
+    cls, pk = rn.unpack(legacy_ref, just_pk=True)
+    assert cls == RefTestModel
+    assert pk == obj.id
+
+
 def test_different_keys_produce_different_refnums():
     '''Different NaCl keys must produce incompatible refnums.'''
     obj = RefTestModel(name='key_test')

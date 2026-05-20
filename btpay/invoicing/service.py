@@ -94,6 +94,7 @@ class InvoiceService:
         inv.recalculate_totals()
 
         log.info('Invoice created: %s (id=%d, org=%d)', inv_number, inv.id, org.id)
+        self._publish_invoice_event('invoice.created', inv)
         return inv
 
     def finalize_invoice(self, invoice, wallet=None):
@@ -126,6 +127,7 @@ class InvoiceService:
 
         invoice.status = 'pending'
         invoice.save()
+        self._watch_invoice_payments(invoice)
         self._flush_to_disk()
 
         log.info('Invoice finalized: %s -> pending', invoice.invoice_number)
@@ -160,6 +162,7 @@ class InvoiceService:
         invoice.status = 'expired'
         invoice.expired_at = NOW()
         invoice.save()
+        self._publish_invoice_event('invoice.expired', invoice)
 
         log.info('Invoice expired: %s', invoice.invoice_number)
         return True
@@ -222,40 +225,61 @@ class InvoiceService:
         )
         payment.save()
 
-        # Update invoice paid amount
-        invoice.amount_paid = invoice.amount_paid + amount_fiat
-
-        # Determine new status
-        if invoice.amount_paid >= invoice.total:
-            invoice.status = 'paid'
-            invoice.paid_at = NOW()
-        elif invoice.amount_paid > 0:
-            # Check if close enough (underpaid gift threshold)
-            remaining = invoice.total - invoice.amount_paid
-            if remaining <= self.underpaid_gift:
-                invoice.status = 'paid'
-                invoice.paid_at = NOW()
-            else:
-                invoice.status = 'partial'
-
-        invoice.save()
-        self._flush_to_disk()
-
-        # Trigger storefront fulfillment on paid transition
-        if invoice.status == 'paid':
-            try:
-                from btpay.storefront.fulfillment import fulfill_storefront_invoice
-                fulfill_storefront_invoice(invoice)
-            except Exception:
-                log.exception('Storefront fulfillment failed for %s', invoice.invoice_number)
+        was_paid = invoice.status in ('paid', 'confirmed')
+        self._credit_invoice(invoice, amount_fiat)
 
         log.info('Payment recorded for %s: %s BTC (%s %s), status=%s',
                  invoice.invoice_number, amount_btc, amount_fiat,
                  invoice.currency, invoice.status)
+        self._publish_invoice_event('payment.received', invoice, payment)
+        if not was_paid and invoice.status == 'paid':
+            self._publish_invoice_event('invoice.paid', invoice, payment)
+        return payment
+
+    def record_fiat_payment(self, invoice, amount_fiat, txid='', address='',
+                            confirmations=0, method='external', raw_data=None):
+        '''
+        Record a non-BTC-denominated payment against an invoice.
+        Used by external processors and stablecoin connectors that report fiat
+        or token units instead of on-chain satoshis.
+        '''
+        with self._payment_lock:
+            return self._record_fiat_payment_locked(
+                invoice, amount_fiat, txid, address, confirmations, method, raw_data)
+
+    def _record_fiat_payment_locked(self, invoice, amount_fiat, txid='', address='',
+                                    confirmations=0, method='external', raw_data=None):
+        from btpay.invoicing.models import Payment
+
+        amount_fiat = Decimal(str(amount_fiat)).quantize(Decimal('0.01'))
+        payment = Payment(
+            invoice_id=invoice.id,
+            method=method,
+            txid=txid,
+            address=address,
+            amount_btc=Decimal('0'),
+            amount_fiat=amount_fiat,
+            exchange_rate=invoice.btc_rate or Decimal('0'),
+            confirmations=confirmations,
+            status='pending' if confirmations == 0 else 'confirmed',
+            raw_data=raw_data or {},
+        )
+        payment.save()
+
+        was_paid = invoice.status in ('paid', 'confirmed')
+        self._credit_invoice(invoice, amount_fiat)
+
+        log.info('Payment recorded for %s: %s %s via %s, status=%s',
+                 invoice.invoice_number, amount_fiat, invoice.currency,
+                 method, invoice.status)
+        self._publish_invoice_event('payment.received', invoice, payment)
+        if not was_paid and invoice.status == 'paid':
+            self._publish_invoice_event('invoice.paid', invoice, payment)
         return payment
 
     def confirm_payment(self, invoice, payment, confirmations):
         '''Mark a payment as confirmed and update invoice status.'''
+        was_confirmed = invoice.status == 'confirmed'
         payment.mark_confirmed(confirmations)
 
         if invoice.status == 'paid':
@@ -266,6 +290,9 @@ class InvoiceService:
             log.info('Invoice confirmed: %s (%d confirmations)',
                      invoice.invoice_number, confirmations)
 
+        self._publish_invoice_event('payment.confirmed', invoice, payment)
+        if not was_confirmed and invoice.status == 'confirmed':
+            self._publish_invoice_event('invoice.confirmed', invoice, payment)
         return invoice
 
     def cancel_invoice(self, invoice):
@@ -287,6 +314,7 @@ class InvoiceService:
         invoice.cancelled_at = NOW()
         invoice.save()
         self._flush_to_disk()
+        self._publish_invoice_event('invoice.cancelled', invoice)
 
         log.info('Invoice cancelled: %s', invoice.invoice_number)
         return invoice
@@ -303,6 +331,83 @@ class InvoiceService:
         return inv_number
 
     # ---- Internal helpers ----
+
+    def _credit_invoice(self, invoice, amount_fiat):
+        '''Apply a fiat payment amount and update invoice status.'''
+        invoice.amount_paid = invoice.amount_paid + amount_fiat
+
+        if invoice.amount_paid >= invoice.total:
+            invoice.status = 'paid'
+            invoice.paid_at = NOW()
+        elif invoice.amount_paid > 0:
+            remaining = invoice.total - invoice.amount_paid
+            if remaining <= self.underpaid_gift:
+                invoice.status = 'paid'
+                invoice.paid_at = NOW()
+            else:
+                invoice.status = 'partial'
+
+        invoice.save()
+        self._flush_to_disk()
+
+        if invoice.status == 'paid':
+            try:
+                from btpay.storefront.fulfillment import fulfill_storefront_invoice
+                fulfill_storefront_invoice(invoice)
+            except Exception:
+                log.exception('Storefront fulfillment failed for %s', invoice.invoice_number)
+
+    def _watch_invoice_payments(self, invoice):
+        '''Register finalized invoice with background monitors when available.'''
+        try:
+            from flask import current_app
+            from btpay.payment_automation import watch_invoice_payments
+            watch_invoice_payments(current_app._get_current_object(), invoice)
+        except RuntimeError:
+            return
+        except Exception:
+            log.exception('Failed to register payment monitors for %s',
+                          invoice.invoice_number)
+
+    def _publish_invoice_event(self, event, invoice, payment=None):
+        '''Send webhook and email side effects when app services are configured.'''
+        try:
+            from flask import current_app
+            app = current_app._get_current_object()
+        except RuntimeError:
+            return
+
+        try:
+            from btpay.auth.models import Organization
+            from btpay.api.serializers import serialize_invoice, serialize_payment
+            org = Organization.get(invoice.org_id)
+            if org is None:
+                return
+
+            payload = {
+                'invoice': serialize_invoice(invoice, include_lines=False),
+            }
+            if payment is not None:
+                payload['payment'] = serialize_payment(payment)
+
+            dispatcher = getattr(app, '_webhook_dispatcher', None)
+            if dispatcher is not None:
+                dispatcher.dispatch(event, payload, org_id=invoice.org_id)
+
+            email_factory = getattr(app, '_email_service_factory', None)
+            if email_factory is None:
+                from btpay.email.service import EmailService
+                email_factory = EmailService
+            email_svc = email_factory.for_org(org, app.config)
+            if not email_svc.is_configured():
+                return
+            if event == 'payment.received' and payment is not None:
+                email_svc.send_payment_received(invoice, payment, org)
+            elif event == 'payment.confirmed' and payment is not None:
+                email_svc.send_payment_confirmed(invoice, payment, org)
+        except Exception:
+            log.exception('Failed to publish %s for invoice %s',
+                          event, invoice.invoice_number)
 
     def _assign_address(self, invoice, wallet):
         '''Assign a fresh BTC address to the invoice.'''

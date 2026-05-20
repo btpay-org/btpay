@@ -328,6 +328,42 @@ class TestConfirmPaymentFlush:
 
 
 # ======================================================================
+# Auth and invoice CSRF coverage
+# ======================================================================
+
+class TestCsrfCoverage:
+
+    def test_password_change_without_csrf_rejected(self, app):
+        client = app.test_client()
+        client.post('/auth/register', json={
+            'email': 'csrf-password@test.com',
+            'password': 'securepass123',
+        })
+
+        resp = client.post('/auth/password', json={
+            'current_password': 'securepass123',
+            'new_password': 'newsecurepass456',
+        })
+        assert resp.status_code == 403
+
+    def test_invoice_create_without_csrf_rejected(self, app):
+        client = app.test_client()
+        client.post('/auth/register', json={
+            'email': 'csrf-invoice@test.com',
+            'password': 'securepass123',
+        })
+
+        resp = client.post('/invoices/create', data={
+            'customer_name': 'CSRF Test',
+            'currency': 'USD',
+            'line_description[]': ['Widget'],
+            'line_qty[]': ['1'],
+            'line_price[]': ['10.00'],
+        })
+        assert resp.status_code == 403
+
+
+# ======================================================================
 # Fix 7: Webhook retry timing honors config
 # ======================================================================
 
